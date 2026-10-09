@@ -1,10 +1,10 @@
 # 自我迭代台账 . project-journal
 
-> 由 journal.py 自动生成（2026-10-09T13:32:40），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
+> 由 journal.py 自动生成（2026-10-09T15:28:19），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
 > 用途：记录本 skill 自身在运行中暴露的 bug / 逻辑问题 / 易用性问题及修订历史。
 > 闭环流程与治理规则见 references/08-self-evolution.md。
 
-- 当前版本：v1.4.0 . 条目 18 条 (applied 18)
+- 当前版本：v1.4.2 . 条目 21 条 (applied 21)
 
 | ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |
 |---|---|---|---|---|---|---|
@@ -26,6 +26,9 @@
 | EV-0016 | 2026-10-09 | docs | low | applied | update 子命令不支持 --body-file，补档案正文需手工写 records/ | 1.3.5 |
 | EV-0017 | 2026-10-09 | schema | low | applied | AGENTS.md anchor 注入的 journal.py 路径用了错误的旧根目录 | 1.3.4 |
 | EV-0018 | 2026-10-09 | docs | high | applied | 授权单轨 CC BY-NC 堵死 B/C/D 变现路径，需双轨化 | 1.4.0 |
+| EV-0019 | 2026-10-09 | bug | medium | applied | evolve-apply 非原子 + 并发发布导致版本幽灵（项目记录引用不存在的 v1.3.6） | 1.4.2 |
+| EV-0020 | 2026-10-09 | feature | medium | applied | 缺少跨项目批量巡检与批量升级（7 个项目需逐个手工处理漂移） | 1.5.0 |
+| EV-0021 | 2026-10-09 | bug | high | applied | 命令 health 崩溃：'Namespace' object has no attribute 'json' | 1.4.1 |
 
 ## EV-0001 案例研究缺少「关键认知与讨论」车道，insight 正文进不了资产包
 
@@ -469,3 +472,101 @@ EV-0017 修复：anchor 注入路径改为优先项目内 scripts/journal.py（�
 EV-0018 修复：新增 LICENSE-COMMERCIAL.md（A 个人 ¥99 / B 小团队 ¥299 / C 企业 ¥3k–10k 三档授权书模板，含授权范围 / 源码约束 / 署名 / 期限 / 历史版本说明）；README 授权段改双轨摘要；manifest.json 增加 license_files 字段并 bump 到 1.4.0
 
 - 修复版本：v1.4.0（2026-10-09）
+
+## EV-0019 evolve-apply 非原子 + 并发发布导致版本幽灵（项目记录引用不存在的 v1.3.6）
+
+- 日期：2026-10-09 . 类别：bug . 严重度：medium . 状态：applied . 发现于：v1.4.0
+- 相关项目：repo-watch
+- 复现命令：多会话并发 evolve-apply 后检查 manifest 与 CHANGELOG 是否一致
+- 证据：repo-watch tracker.json: skill_version=1.3.6, upgrades 含 1.3.5->1.3.6；git log --all -S1.3.6 无结果；HEAD=v1.4.0 未推送，远程=v1.3.3
+
+**症状 / 期望**
+
+```
+**现象（版本幽灵 + 发布未闭环）**
+
+- repo-watch 的 tracker.json 记录：@@upgrades: 1.3.3 -> 1.3.5 -> 1.3.6@@，@@skill_version: "1.3.6"@@，@@protocol_version: "1.3.6"@@
+- 但 @@git log@@ 显示 manifest 版本沿革是 @@770ad8e=v1.3.3 -> 084bf79=v1.4.0@@；
+  @@git log --all -S"1.3.6"@@ 反馈该字符串**从未出现在 CHANGELOG 或 manifest 的任何提交中**。
+- 即：v1.3.6 只存在于某个时刻的**工作区**里，既没有 CHANGELOG 条目，也没有独立提交；
+  v1.3.4 / v1.3.5 同样没有独立提交，被一次性扫进 v1.4.0 的提交。
+- 另一个后果：本地 HEAD(v1.4.0) **未推送**，远程仍停在 v1.3.3，且远程仓库描述仍是旧的"单轨禁止商用"，与本地双轨授权不一致。
+
+**根因（两条）**
+1. @@evolve-apply@@ 不是原子的：它先改 manifest 版本号，再写 CHANGELOG，最后标记台账。
+   进程在中间失败或被杀，就会留下"版本号已升但无 CHANGELOG / 台账未改"的半成品。
+2. 发布流程没有闭环校验：没有任何检查保证"manifest 版本 == CHANGELOG 顶 == git HEAD == 远程 HEAD"。
+   多个会话（本次实测：同一 skill 被多个 Agent 会话并发使用）交替 bump 时必然踩到。
+
+**影响**：版本追溯失真 —— 项目记录会引用一个不存在的 skill 版本，事后无法判断当时到底是哪份代码在跑。
+
+**修复方向**：
+1. @@evolve-apply@@ 改为"先写 CHANGELOG 与台账，最后一步原子换入 manifest 版本号"，任一步失败即回滚；
+   并在结尾自检 manifest/CHANGELOG/git 状态。
+2. 新增 @@doctor --release@@（或 publish 前置检查）：校验 manifest == CHANGELOG 顶 == 最近 commit 标题版本，
+   并提示 @@git status / 未推送提交@@。
+3. 文档补一条：多个 Agent 并发使用同一 skill 时，发布必须串行（谁 bump 谁提交并推送）。
+```
+
+**修复**
+
+修复版本幽灵的根因：evolve-apply 改为两阶段原子发布（先写 CHANGELOG 与台账、最后换入 manifest 版本号，任一步失败即全量回滚），新增 evolution/.pending-release.json 标记用于进程被强杀后收敛；doctor 增加发布一致性校验，并新增 --release 用 ls-remote 权威校验远程，避免本地 origin/main 引用过期造成误判。更正：上次报告中本地 v1.4.0 未推送的结论系本地引用过期所致误判，已用 ls-remote 核实远程同步
+
+- 修复版本：v1.4.2（2026-10-09）
+
+## EV-0020 缺少跨项目批量巡检与批量升级（7 个项目需逐个手工处理漂移）
+
+- 日期：2026-10-09 . 类别：feature . 严重度：medium . 状态：applied . 发现于：v1.4.0
+- 相关项目：-
+- 复现命令：journal.py doctor（不带项目上下文）
+- 证据：巡检发现 6/7 项目版本落后；doctor 只检查 skill 自身；无 health / upgrade --all 入口
+
+**症状 / 期望**
+
+```
+**场景**：本 skill 已被实际用在 7 个项目上（本次巡检实测）。
+
+**缺口**：只能一个一个项目地 @@lint@@ / @@status@@ / @@upgrade@@，缺少跨项目的批量视角：
+- 6/7 个项目停在旧版本（v1.2.0 / v1.3.3 / v1.3.4 / v1.3.6 / v1.3.3），需要逐条手工 upgrade
+- 每个项目单独 lint 才知道是否落后，没有"一次看全部"的入口
+- @@doctor@@ 只检查 skill 自身安装，不检查"skill 与各项目记录目录"的一致性
+
+**期望能力**：
+1. @@journal.py health --root <父目录>@@：扫描所有记录目录，输出 项目 / 阶段 / 记录量 / 版本差 / lint 结论 / CHARTER 待填 / 锚点状态 的健康报告
+2. @@journal.py upgrade --all <父目录>@@：批量迁移到当前版本（保留"不动日记与档案"的语义）
+3. @@doctor@@ 增加汇总：多少项目落后、多少缺锚点、多少 CHARTER 未填
+
+**价值**：项目一多，"记得升级"就靠不住了；应该让工具主动把漂移摆到面前。
+```
+
+**修复**
+
+新增跨项目健康巡检与批量迁移：journal.py health --root 父目录（版本漂移 / 锚点缺失 / CHARTER 待填 / 停滞 / 空壳 / 记录量 一表看完，支持 --json）；journal.py upgrade --all 父目录 批量迁移到当前版本，保持只动 tracker、契约与锚点、不改写日记与档案的语义；新增第 36-37 项回归用例
+
+- 修复版本：v1.5.0（2026-10-09）
+
+## EV-0021 命令 health 崩溃：'Namespace' object has no attribute 'json'
+
+- 日期：2026-10-09 . 类别：bug . 严重度：high . 状态：applied . 发现于：v1.4.0
+- 相关项目：C:/Users/49046/AppData/Local/Temp/pj-selftest-hc6kdrse/farm
+- 复现命令：journal.py health --root C:\Users\49046\AppData\Local\Temp\pj-selftest-hc6kdrse\farm
+- 证据：journal.py health --root C:\Users\49046\AppData\Local\Temp\pj-selftest-hc6kdrse\farm
+
+**症状 / 期望**
+
+```
+Traceback (most recent call last):
+  File "E:\程序\github\我的项目\project-journal\scripts\journal.py", line 2281, in main
+    return HANDLERS[args.cmd](args) or 0
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\程序\github\我的项目\project-journal\scripts\journal.py", line 2082, in cmd_health
+    if args.json:
+       ^^^^^^^^^
+AttributeError: 'Namespace' object has no attribute 'json'
+```
+
+**修复**
+
+修复 health 命令缺少 --json 参数导致的崩溃（该崩溃在首次真实运行时被崩溃自动记录机制捕获为 EV-0021）；补齐参数并新增第 38 项回归用例
+
+- 修复版本：v1.4.1（2026-10-09）

@@ -1700,6 +1700,68 @@ def cmd_evolve_list(args):
     return 0
 
 
+PENDING_RELEASE = None  # 在下方延迟初始化（依赖 SKILL_DIR）
+
+
+def _pending_path():
+    return os.path.join(SKILL_DIR, "evolution", ".pending-release.json")
+
+
+def release_state():
+    """发布一致性状态：manifest 版本 / CHANGELOG 顶部版本 / 是否有未完成的发布标记"""
+    m = skill_manifest().get("version")
+    ch = read_text(os.path.join(SKILL_DIR, "CHANGELOG.md"))
+    mt = re.search(r"^##\s*\[([0-9]+\.[0-9]+\.[0-9]+)\]", ch, re.M)
+    pend = None
+    p = _pending_path()
+    if os.path.isfile(p):
+        try:
+            pend = json.loads(read_text(p))
+        except Exception:
+            pend = {"broken": True}
+    return {"manifest": m, "changelog": mt.group(1) if mt else None, "pending": pend}
+
+
+def write_group_atomic(items):
+    """一组文件全部写成功，或全部回滚。items: [(path, content), ...]
+    进程被强杀时回滚不会执行 —— 靠 .pending-release.json 在下次收敛。"""
+    snaps = [(p, read_text(p) if os.path.isfile(p) else None) for p, _ in items]
+    try:
+        for p, c in items:
+            write_text(p, c)
+        return True, None
+    except Exception as e:
+        for p, old in snaps:
+            try:
+                if old is None:
+                    if os.path.isfile(p):
+                        os.remove(p)
+                else:
+                    write_text(p, old)
+            except OSError:
+                pass
+        return False, e
+
+
+def find_trackers(root, maxdepth=4):
+    """在 root 下查找所有记录目录（含 tracker.json），用于批量 health / upgrade"""
+    root = os.path.abspath(root)
+    if not os.path.isdir(root):
+        return []
+    base = root.rstrip("\\/").count(os.sep)
+    skip = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".cache", ".idea"}
+    out = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        if dirpath.count(os.sep) - base > maxdepth:
+            dirnames[:] = []
+            continue
+        dirnames[:] = [d for d in dirnames if d not in skip]
+        if "tracker.json" in filenames:
+            out.append(dirpath)
+            dirnames[:] = []
+    return sorted(out)
+
+
 def cmd_evolve_apply(args):
     led = load_ledger(args.ledger_dir)
     ent = None
@@ -1714,6 +1776,34 @@ def cmd_evolve_apply(args):
         return 0
     if not args.summary:
         die("必须提供 --summary，写清这次改了什么、为什么（会写进 CHANGELOG）")
+    cur = skill_version()
+    new_ver = bump_version(cur, args.bump)
+    entry = ("## [%s] - %s\n"
+             "- %s（%s）\n"
+             "- 类别 / 严重度：%s / %s\n"
+             "- 台账：evolution/LEDGER.md 的 %s\n\n") % (
+        new_ver, today_str(), args.summary, args.id, ent.get("category"), ent.get("severity"), args.id)
+    chp = os.path.join(SKILL_DIR, "CHANGELOG.md")
+    old_ch = read_text(chp)
+    if "<!-- CHANGELOG:INSERT -->" in old_ch:
+        new_ch = old_ch.replace("<!-- CHANGELOG:INSERT -->", "<!-- CHANGELOG:INSERT -->\n\n" + entry.rstrip("\n"), 1)
+    elif old_ch:
+        new_ch = old_ch.rstrip("\n") + "\n\n" + entry
+    else:
+        new_ch = "# CHANGELOG . project-journal\n\n" + entry
+    m = skill_manifest()
+    m["version"] = new_ver
+    m["updated"] = today_str()
+    mp = os.path.join(SKILL_DIR, "manifest.json")
+
+    if args.dry_run:
+        say("[dry-run] 将执行（不写任何文件）：")
+        say("   manifest.json   %s -> %s" % (cur, new_ver))
+        say("   CHANGELOG.md    顶部插入 [%s]" % new_ver)
+        say("   台账            %s -> applied（v%s）" % (args.id, new_ver))
+        say("   当前版本号保持不变：v%s" % skill_version())
+        return 0
+
     if not args.no_selftest:
         st = os.path.join(HERE, "selftest.py")
         if os.path.isfile(st):
@@ -1724,39 +1814,53 @@ def cmd_evolve_apply(args):
                 return 1
         else:
             say("[WARN] 未找到 scripts/selftest.py，跳过自测（不推荐）")
-    cur = skill_version()
-    new_ver = bump_version(cur, args.bump)
-    m = skill_manifest()
-    m["version"] = new_ver
-    m["updated"] = today_str()
-    write_text(os.path.join(SKILL_DIR, "manifest.json"), json.dumps(m, ensure_ascii=False, indent=2) + "\n")
-    entry = ("## [%s] - %s\n"
-             "- %s（%s）\n"
-             "- 类别 / 严重度：%s / %s\n"
-             "- 台账：evolution/LEDGER.md 的 %s\n\n") % (
-        new_ver, today_str(), args.summary, args.id, ent.get("category"), ent.get("severity"), args.id)
-    chp = os.path.join(SKILL_DIR, "CHANGELOG.md")
-    old = read_text(chp)
-    if "<!-- CHANGELOG:INSERT -->" in old:
-        new = old.replace("<!-- CHANGELOG:INSERT -->", "<!-- CHANGELOG:INSERT -->\n\n" + entry.rstrip("\n"), 1)
-    elif old:
-        new = old.rstrip("\n") + "\n\n" + entry
-    else:
-        new = "# CHANGELOG . project-journal\n\n" + entry
-    write_text(chp, new)
+
     ent["status"] = "applied"
     ent["version"] = new_ver
     ent["resolution_date"] = today_str()
     ent["fix"] = args.summary
-    save_ledger(led, args.ledger_dir)
-    say("[OK] %s -> applied（v%s -> v%s），CHANGELOG 已更新。" % (args.id, cur, new_ver))
-    say("     若改动涉及记录格式/字段，请对已有项目跑：journal.py upgrade --root <记录目录>")
-    say("     若改动涉及 SKILL.md 的流程，请同步更新 references/ 与本文档说明。")
+    led["skill"] = "project-journal"
+    led["version"] = new_ver
+    ldir = ledger_dir(args.ledger_dir)
+    pend = {"id": args.id, "from": cur, "to": new_ver, "summary": args.summary,
+            "started": now_iso(), "stage": "started"}
+    write_text(_pending_path(), json.dumps(pend, ensure_ascii=False, indent=2))
+
+    # 两阶段：先 CHANGELOG 与台账，最后换入 manifest 的版本号。
+    # manifest 最后写，保证"绝不会出现版本号已升但没有 CHANGELOG 条目"的幽灵版本。
+    items = [
+        (chp, new_ch),
+        (os.path.join(ldir, "ledger.json"), json.dumps(led, ensure_ascii=False, indent=2) + "\n"),
+        (os.path.join(ldir, "LEDGER.md"), ledger_md(led)),
+        (mp, json.dumps(m, ensure_ascii=False, indent=2) + "\n"),
+    ]
+    ok, err = write_group_atomic(items)
+    if not ok:
+        try:
+            os.remove(_pending_path())
+        except OSError:
+            pass
+        say("[ERROR] 发布失败，已回滚全部文件：%s" % err)
+        return 1
+    try:
+        os.remove(_pending_path())
+    except OSError:
+        pass
+    say("[OK] %s -> applied（v%s -> v%s），CHANGELOG 与台账已更新。" % (args.id, cur, new_ver))
+    st = release_state()
+    if st["manifest"] == st["changelog"] == new_ver and not st["pending"]:
+        say("     发布一致性 OK（manifest == CHANGELOG 顶部 == v%s）" % new_ver)
+    else:
+        say("     [WARN] 发布一致性异常：manifest=%s / CHANGELOG=%s / 未完成标记=%s"
+            % (st["manifest"], st["changelog"], bool(st["pending"])))
+    say("     下一步：git add -A && git commit -m 'v%s: ...' && git push（doctor --release 可校验远程）" % new_ver)
+    say("     若改动涉及记录格式/字段，请对已有项目跑：journal.py upgrade --all <父目录>")
     return 0
 
 
 def cmd_doctor(args):
     fails, warns = [], []
+    release_note = None
     need = ["SKILL.md", "manifest.json", "CHANGELOG.md", "scripts/journal.py", "scripts/selftest.py",
             "references/00-protocol.md", "references/01-taxonomy.md", "references/02-writing-guide.md",
             "references/03-cadence.md", "references/04-monetization.md", "references/05-closeout.md",
@@ -1789,9 +1893,51 @@ def cmd_doctor(args):
                 py_compile.compile(p, cfile=os.path.join(tempfile.gettempdir(), "pj_doctor_check.pyc"), doraise=True)
             except Exception as e:
                 fails.append("%s 语法错误：%s" % (fn, e))
+    # ---- 发布一致性（EV-0019：防止版本幽灵）----
+    st = release_state()
+    if st["manifest"] and st["changelog"] and st["manifest"] != st["changelog"]:
+        fails.append("发布不一致：manifest=v%s / CHANGELOG 顶部=v%s（上一次 evolve-apply 可能未完成）"
+                     % (st["manifest"], st["changelog"]))
+    if st["pending"]:
+        pend = st["pending"]
+        if pend.get("broken"):
+            warns.append("evolution/.pending-release.json 无法解析，请人工确认后删除")
+        else:
+            warns.append("存在未完成的发布标记：%s（v%s -> v%s）—— 重跑 evolve-apply 或删除该文件"
+                         % (pend.get("id"), pend.get("from"), pend.get("to")))
+    # ---- git 发布闭环 ----
+    try:
+        g1 = subprocess.run(["git", "-C", SKILL_DIR, "status", "--porcelain"],
+                            capture_output=True, text=True, timeout=15)
+        if g1.returncode == 0 and g1.stdout.strip():
+            warns.append("有 %d 个文件未提交（发布应提交后推送）" % len(g1.stdout.strip().splitlines()))
+        if args.release:
+            # 用 ls-remote 取权威远程 HEAD，避免本地 origin/main 引用过期造成误判
+            g2 = subprocess.run(["git", "-C", SKILL_DIR, "ls-remote", "--heads", "origin", "main"],
+                                capture_output=True, text=True, timeout=40)
+            head = subprocess.run(["git", "-C", SKILL_DIR, "rev-parse", "HEAD"],
+                                  capture_output=True, text=True, timeout=15).stdout.strip()
+            if g2.returncode != 0:
+                release_note = "无法访问远程（%s）" % (g2.stderr or "").strip()[:80]
+                warns.append("--release：" + release_note)
+            elif head and g2.stdout.strip() and not g2.stdout.strip().startswith(head):
+                release_note = "本地 HEAD(%s) != 远程 main(%s)" % (head[:8], g2.stdout.split()[0][:8])
+                fails.append("--release：尚未推送或远程更新 —— " + release_note)
+            else:
+                release_note = "远程 main 与本地 HEAD 一致（%s）" % head[:8]
+        else:
+            g3 = subprocess.run(["git", "-C", SKILL_DIR, "rev-list", "--count", "origin/main..HEAD"],
+                                capture_output=True, text=True, timeout=15)
+            if g3.returncode == 0 and g3.stdout.strip() not in ("", "0"):
+                warns.append("本地比 origin/main 多 %s 个提交（注意：origin/main 引用可能过期，"
+                             "用 doctor --release 权威校验）" % g3.stdout.strip())
+    except Exception:
+        pass
     led = load_ledger(None)
     ents = led.get("entries", [])
     openn = [x for x in ents if x.get("status") in ("open", "proposed", "in-progress")]
+    if args.release:
+        say("[INFO] 远程校验：%s" % (release_note or "未取得结论"))
     for f in fails:
         say("[FAIL] %s" % f)
     for w in warns:
@@ -1804,8 +1950,7 @@ def cmd_doctor(args):
     return 1 if fails else 0
 
 
-def cmd_upgrade(args):
-    root = require_root(args)
+def upgrade_one(root, args, quiet=False):
     t = load_tracker(root)
     changes = []
     old_ver = t.get("skill_version") or "0.0.0"
@@ -1847,14 +1992,126 @@ def cmd_upgrade(args):
     save_tracker(root, t)
     target, action = inject_anchor(root, t, args.project_root, args.anchor)
     refresh(root, t)
-    say("[OK] 记录目录已升级：v%s -> v%s" % (old_ver, skill_version()))
-    for c in changes:
-        say("     - %s" % c)
-    if not changes:
-        say("     （无需结构性改动，仅刷新 STATE/INDEX 与锚点）")
-    if target:
-        say("[OK] %s锚点：%s" % (action, target))
-    say("     升级只动 tracker.json / PROTOCOL.md / AGENTS.md 锚点，**不改写任何日记与档案**。")
+    if not quiet:
+        say("[OK] 记录目录已升级：v%s -> v%s" % (old_ver, skill_version()))
+        for c in changes:
+            say("     - %s" % c)
+        if not changes:
+            say("     （无需结构性改动，仅刷新 STATE/INDEX 与锚点）")
+        if target:
+            say("[OK] %s锚点：%s" % (action, target))
+        say("     升级只动 tracker.json / PROTOCOL.md / AGENTS.md 锚点，**不改写任何日记与档案**。")
+    return {"ok": True, "old": old_ver, "new": skill_version(), "changes": changes,
+            "anchor": bool(target), "root": root}
+
+
+def cmd_upgrade(args):
+    if getattr(args, "all", None):
+        parent = os.path.abspath(args.all)
+        if not os.path.isdir(parent):
+            die("目录不存在：%s" % parent)
+        dirs = find_trackers(parent, getattr(args, "depth", 4))
+        if not dirs:
+            die("在 %s 下没找到任何记录目录（tracker.json）" % parent)
+        say("发现 %d 个记录目录，批量迁移到 v%s" % (len(dirs), skill_version()))
+        say("")
+        rows = []
+        for d in dirs:
+            try:
+                r = upgrade_one(d, args, quiet=True)
+            except SystemExit:
+                r = {"ok": False, "old": "?", "new": "?", "changes": ["读取失败，已跳过"], "anchor": False}
+            rows.append((d, r))
+        for d, r in rows:
+            name = os.path.basename(os.path.dirname(d)) or d
+            say("[%s] %-24s v%s -> v%s  锚点:%s" % (
+                "OK  " if r.get("ok") else "FAIL", name[:22], r.get("old"), r.get("new"),
+                "有" if r.get("anchor") else "无"))
+            for c in r.get("changes", [])[:3]:
+                say("          - %s" % c)
+        ok_n = len([1 for _, r in rows if r.get("ok")])
+        say("")
+        say("完成：%d/%d 个记录目录已迁移到 v%s（日记与档案一字未动）" % (ok_n, len(rows), skill_version()))
+        return 0 if ok_n == len(rows) else 1
+    root = require_root(args)
+    r = upgrade_one(root, args, quiet=False)
+    return 0 if r.get("ok") else 1
+
+
+def health_one(d, ver):
+    t = {}
+    try:
+        t = json.loads(read_text(tracker_path(d)))
+    except Exception:
+        pass
+    jd = os.path.join(d, "journal")
+    days = sorted(f[:-3] for f in os.listdir(jd)) if os.path.isdir(jd) else []
+    entries = 0
+    for f in days:
+        entries += len(re.findall(r"^###\s", read_text(os.path.join(jd, f + ".md")), re.M))
+    recs = scan_records(d) if os.path.isdir(os.path.join(d, "records")) else []
+    opens = len([r for r in recs if r["type"] == "problem"
+                 and (r["status"] or "open") not in ("solved", "closed", "done", "wontfix")])
+    proj_root = os.path.dirname(os.path.abspath(d))
+    anchor = False
+    for fn in ("AGENTS.md", "CLAUDE.md"):
+        f = os.path.join(proj_root, fn)
+        if os.path.isfile(f) and "project-journal:begin" in read_text(f):
+            anchor = True
+    sver = t.get("skill_version") or "?"
+    pver = t.get("protocol_version") or "?"
+    return {
+        "dir": d, "project": t.get("project") or os.path.basename(proj_root),
+        "stage": t.get("stage") or "?", "outcome": t.get("outcome"),
+        "created": t.get("created") or "?", "last_entry": t.get("last_entry") or "",
+        "stale_days": (days_between(t.get("last_entry"), today_str()) if t.get("last_entry") else None),
+        "journal_days": len(days), "entries": entries, "records": len(recs),
+        "open_problems": opens, "charter_todo": read_text(os.path.join(d, "CHARTER.md")).count("待填"),
+        "anchor": anchor, "skill_version": sver, "protocol_version": pver,
+        "needs_upgrade": (sver != ver) or (pver != ver),
+    }
+
+
+def cmd_health(args):
+    root = os.path.abspath(args.root) if args.root else os.getcwd()
+    ver = skill_version()
+    rows = [health_one(d, ver) for d in find_trackers(root, getattr(args, "depth", 4))]
+    if not rows:
+        say("在 %s 下没找到记录目录（tracker.json）" % root.replace(os.sep, "/"))
+        return 0
+    if args.json:
+        say(json.dumps(rows, ensure_ascii=False, indent=2))
+        return 0
+    say("记录目录健康报告 . skill v%s . 扫描 %s" % (ver, root.replace(os.sep, "/")))
+    say("")
+    say("%-20s %-4s %5s %5s %5s %6s %8s  %s"
+        % ("项目", "阶段", "日记", "条目", "档案", "未闭环", "版本", "状态"))
+    for x in rows:
+        flags = []
+        if x["needs_upgrade"]:
+            flags.append("升到v%s" % ver)
+        if not x["anchor"]:
+            flags.append("缺锚点")
+        if x["charter_todo"]:
+            flags.append("CHARTER待填%d" % x["charter_todo"])
+        if x["stale_days"] and x["stale_days"] >= 7 and not x["outcome"]:
+            flags.append("停滞%dd" % x["stale_days"])
+        if x["entries"] == 0:
+            flags.append("空壳")
+        say("%-20s %-4s %5d %5d %5d %6d %8s  %s" % (
+            x["project"][:18], x["stage"], x["journal_days"], x["entries"], x["records"],
+            x["open_problems"], "v" + str(x["skill_version"]), " . ".join(flags) or "OK"))
+    need = [x for x in rows if x["needs_upgrade"]]
+    say("")
+    say("汇总：%d 个项目 . %d 个需升级 . %d 个缺锚点 . %d 个 CHARTER 未填 . 日记 %d 条 / 档案 %d 份"
+        % (len(rows), len(need), len([x for x in rows if not x["anchor"]]),
+           len([x for x in rows if x["charter_todo"]]),
+           sum(x["entries"] for x in rows), sum(x["records"] for x in rows)))
+    if need:
+        say("")
+        say("一键迁移：journal.py upgrade --all \"%s\"" % root.replace(os.sep, "/"))
+        for x in need:
+            say("  · %-22s v%s -> v%s" % (x["project"][:20], x["skill_version"], ver))
     return 0
 
 
@@ -1956,6 +2213,8 @@ def build_parser():
     s.add_argument("--anchor")
     s.add_argument("--keep-protocol", dest="keep_protocol", action="store_true",
                    help="不覆盖 PROTOCOL.md，把新版写成 PROTOCOL.md.new（默认会备份后刷新）")
+    s.add_argument("--all", help="批量模式：扫描该父目录下的所有记录目录并逐个迁移（忽略 --root）")
+    s.add_argument("--depth", type=int, default=4, help="--all 扫描深度（默认 4）")
 
     s = add("evolve", "记录 skill 自身的问题/改进（自我迭代台账）")
     s.add_argument("--category", required=True, choices=EVOLVE_CATEGORIES)
@@ -1981,9 +2240,17 @@ def build_parser():
     s.add_argument("--bump", default="patch", choices=["patch", "minor", "major"])
     s.add_argument("--ledger-dir", dest="ledger_dir")
     s.add_argument("--no-selftest", dest="no_selftest", action="store_true")
+    s.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="只演示将要写入的三个文件，不改动版本号与任何文件")
     s.add_argument("--force", action="store_true")
 
-    s = add("doctor", "skill 安装自检（文件/版本/语法/台账）")
+    s = add("doctor", "skill 安装自检（文件/版本/语法/台账/发布闭环）")
+    s.add_argument("--release", action="store_true",
+                   help="额外用 ls-remote 权威校验远程是否已包含本地 HEAD（避免本地引用过期误判）")
+
+    s = add("health", "跨项目健康巡检：版本漂移 / 锚点 / CHARTER / 停滞 / 记录量")
+    s.add_argument("--depth", type=int, default=4)
+    s.add_argument("--json", action="store_true", help="输出机器可读 JSON")
 
     s = sub.add_parser("vault-index", help="跨项目总览")
     s.add_argument("--root")
@@ -1996,7 +2263,7 @@ HANDLERS = {
     "stage": cmd_stage, "index": cmd_index, "lint": cmd_lint, "review": cmd_review,
     "closeout": cmd_closeout, "publish": cmd_publish, "vault-index": cmd_vault_index,
     "upgrade": cmd_upgrade, "evolve": cmd_evolve, "evolve-list": cmd_evolve_list,
-    "evolve-apply": cmd_evolve_apply, "doctor": cmd_doctor,
+    "evolve-apply": cmd_evolve_apply, "doctor": cmd_doctor, "health": cmd_health,
 }
 
 

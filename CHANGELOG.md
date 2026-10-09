@@ -5,6 +5,21 @@
 
 <!-- CHANGELOG:INSERT -->
 
+## [1.5.0] - 2026-10-09
+- 新增跨项目健康巡检与批量迁移：journal.py health --root 父目录（版本漂移 / 锚点缺失 / CHARTER 待填 / 停滞 / 空壳 / 记录量 一表看完，支持 --json）；journal.py upgrade --all 父目录 批量迁移到当前版本，保持只动 tracker、契约与锚点、不改写日记与档案的语义；新增第 36-37 项回归用例（EV-0020）
+- 类别 / 严重度：feature / medium
+- 台账：evolution/LEDGER.md 的 EV-0020
+
+## [1.4.2] - 2026-10-09
+- 修复版本幽灵的根因：evolve-apply 改为两阶段原子发布（先写 CHANGELOG 与台账、最后换入 manifest 版本号，任一步失败即全量回滚），新增 evolution/.pending-release.json 标记用于进程被强杀后收敛；doctor 增加发布一致性校验，并新增 --release 用 ls-remote 权威校验远程，避免本地 origin/main 引用过期造成误判。更正：上次报告中本地 v1.4.0 未推送的结论系本地引用过期所致误判，已用 ls-remote 核实远程同步（EV-0019）
+- 类别 / 严重度：bug / medium
+- 台账：evolution/LEDGER.md 的 EV-0019
+
+## [1.4.1] - 2026-10-09
+- 修复 health 命令缺少 --json 参数导致的崩溃（该崩溃在首次真实运行时被崩溃自动记录机制捕获为 EV-0021）；补齐参数并新增第 38 项回归用例（EV-0021）
+- 类别 / 严重度：bug / high
+- 台账：evolution/LEDGER.md 的 EV-0021
+
 ## [1.4.0] - 2026-10-09
 - 授权双轨化：新增 `LICENSE-COMMERCIAL.md`（个人商用 ¥99 / 小团队 ¥299 / 企业 ¥3k–10k 三档授权书模板，含授权范围 / 源码约束 / 署名 / 期限 / 历史版本说明）；CC BY-NC 4.0 继续覆盖个人与非营利场景，商业方向（案例包付费 / 企业授权 / 白标分发）解锁。README 顶部与授权段改为双轨摘要，`manifest.json` 增加 `license_files` 字段并把 license 描述改为 "CC-BY-NC-4.0 + Commercial-License"。历史版本说明：≤v1.2.2 仍 MIT（不可撤回），≥v1.3.0 起双轨（EV-0018）
 - 类别 / 严重度：feature / high

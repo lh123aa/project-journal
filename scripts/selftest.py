@@ -266,6 +266,25 @@ def main():
               and "0.1 口令表" in skill_md,
               "缺失口令；codex_md 尾部=" + codex_md[-160:])
 
+        mf_before = json.loads(r(os.path.join(SKILL_DIR, "manifest.json"))).get("version")
+        rc, out = run(["evolve-apply", "--id", "EV-0001", "--bump", "patch",
+                       "--summary", "dry-run 用例", "--dry-run"], env=env)
+        mf_after = json.loads(r(os.path.join(SKILL_DIR, "manifest.json"))).get("version")
+        check("evolve-apply --dry-run 不写文件、不改版本号（EV-0019）",
+              rc == 0 and mf_before == mf_after and "dry-run" in out, out[-220:])
+
+        farm = os.path.join(tmp, "farm")
+        for nm in ("alpha", "beta"):
+            d = os.path.join(farm, nm, "project-journal")
+            os.makedirs(d, exist_ok=True)
+            run(["init", "--root", d, "--project", nm, "--success", "s", "--stop-loss", "x"])
+        rc, out = run(["health", "--root", farm])
+        check("health 跨项目巡检（EV-0020）",
+              rc == 0 and "alpha" in out and "beta" in out and "汇总" in out, out[-300:])
+        rc, out = run(["upgrade", "--all", farm])
+        check("upgrade --all 批量迁移（EV-0020）",
+              rc == 0 and out.count("[OK  ]") == 2, out[-300:])
+
         broken = os.path.join(tmp, "broken", "project-journal")
         run(["init", "--root", broken, "--project", "Broken"])
         csvp = os.path.join(broken, "metrics", "metrics.csv")
