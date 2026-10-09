@@ -5,6 +5,11 @@
 
 <!-- CHANGELOG:INSERT -->
 
+## [1.2.1] - 2026-10-09
+- 新增最短口令表：跟踪项目 / 记一下 / 项目状态 / 复盘 / 结项 / 出资产（词组即命令，覆盖全生命周期），并同步写入 SKILL.md（含 frontmatter 触发词）、references/00-protocol.md（随 upgrade 分发到各项目）与 install-global.py 的全局托管块（所有工具全局指令首屏即为口令表）；补第 28 项回归用例防止口令表丢失（EV-0010）
+- 类别 / 严重度：usability / medium
+- 台账：evolution/LEDGER.md 的 EV-0010
+
 ## [1.2.0] - 2026-10-09
 - 新增 scripts/install-global.py：以 ~/.agents/skills/project-journal 为唯一真源，一键把 skill 注册为全局技能——Claude Code/opencode/Cursor 建 junction 链接（PowerShell 优先，cmd mklink 兜底且校验结果），Codex/Gemini/Windsurf 注入幂等托管块，DSH 原生发现不重复注册；链接指向 git 仓库，git pull 即可全工具升级。修复 cmd.exe 参数解析偶发失败导致静默退化为复制的问题（现明确告警）。新增 USAGE.md 完整手册与第 27 项回归用例（EV-0009）
 - 类别 / 严重度：feature / high

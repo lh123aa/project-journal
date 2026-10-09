@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "skill": "project-journal",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "entries": [
     {
       "id": "EV-0001",
@@ -154,6 +154,23 @@
       "skill_version": "1.1.3",
       "fingerprint": "e1071d950e54",
       "version": "1.2.0",
+      "resolution_date": "2026-10-09"
+    },
+    {
+      "id": "EV-0010",
+      "date": "2026-10-09",
+      "category": "usability",
+      "severity": "medium",
+      "status": "applied",
+      "title": "显性调用口令太长记不住，缺少最短口令表",
+      "symptom": "**现象**：显性调用方式要求用户说出\"使用 project-journal skill 跟踪这个项目\"这类完整句，\n既长又难记 —— 结果是用户宁愿不用显性调用，技能的可发现性下降。\n\n**根因**：口令设计以\"描述清楚\"为目标，而不是以\"用户记得住\"为目标。\n文档里给的是完整句子，没有给出**一组最短口令**；全局指令托管块也没有以口令开头。\n\n**修复方向**：\n1. 固定 6 个词组作为覆盖全生命周期的口令，且每个词都直接对应一条底层命令\n2. 三个地方同步：SKILL.md（含 frontmatter description 触发词）、references/00-protocol.md（随 upgrade 分发到各项目）、\n   install-global.py 的全局托管块（所有工具的全局指令首屏就是口令表）\n3. 补回归用例：全局托管块里必须出现主口令，防止以后改文档时把它弄丢\n\n**口令表**：跟踪项目 / 记一下 / 项目状态 / 复盘 / 结项 / 出资产",
+      "evidence": "SKILL.md 与全局托管块中只有完整句式，无短口令；用户反馈记不住",
+      "repro": "让用户凭记忆说出调用方式",
+      "project": "haiwai-bianxian",
+      "fix": "新增最短口令表：跟踪项目 / 记一下 / 项目状态 / 复盘 / 结项 / 出资产（词组即命令，覆盖全生命周期），并同步写入 SKILL.md（含 frontmatter 触发词）、references/00-protocol.md（随 upgrade 分发到各项目）与 install-global.py 的全局托管块（所有工具全局指令首屏即为口令表）；补第 28 项回归用例防止口令表丢失",
+      "skill_version": "1.2.0",
+      "fingerprint": "20ca3b7e854d",
+      "version": "1.2.1",
       "resolution_date": "2026-10-09"
     }
   ]

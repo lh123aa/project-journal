@@ -1,10 +1,10 @@
 # 自我迭代台账 . project-journal
 
-> 由 journal.py 自动生成（2026-10-09T11:29:04），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
+> 由 journal.py 自动生成（2026-10-09T11:46:07），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
 > 用途：记录本 skill 自身在运行中暴露的 bug / 逻辑问题 / 易用性问题及修订历史。
 > 闭环流程与治理规则见 references/08-self-evolution.md。
 
-- 当前版本：v1.2.0 . 条目 9 条 (applied 9)
+- 当前版本：v1.2.1 . 条目 10 条 (applied 10)
 
 | ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |
 |---|---|---|---|---|---|---|
@@ -17,6 +17,7 @@
 | EV-0007 | 2026-10-09 | logic | medium | applied | 记录目录应固定在项目根的子文件夹；且向上找 .git 会把锚点注入到上级仓库 | 1.1.2 |
 | EV-0008 | 2026-10-09 | bug | medium | applied | 误报：合规的日记文件名被判为不合规 | 1.1.3 |
 | EV-0009 | 2026-10-09 | feature | high | applied | 缺少跨工具全局注册：所有 Agent 工具都能发现并调用本 skill | 1.2.0 |
+| EV-0010 | 2026-10-09 | usability | medium | applied | 显性调用口令太长记不住，缺少最短口令表 | 1.2.1 |
 
 ## EV-0001 案例研究缺少「关键认知与讨论」车道，insight 正文进不了资产包
 
@@ -243,3 +244,34 @@ upgrade 改为先备份再刷新工具生成的 PROTOCOL.md（新增 --keep-prot
 新增 scripts/install-global.py：以 ~/.agents/skills/project-journal 为唯一真源，一键把 skill 注册为全局技能——Claude Code/opencode/Cursor 建 junction 链接（PowerShell 优先，cmd mklink 兜底且校验结果），Codex/Gemini/Windsurf 注入幂等托管块，DSH 原生发现不重复注册；链接指向 git 仓库，git pull 即可全工具升级。修复 cmd.exe 参数解析偶发失败导致静默退化为复制的问题（现明确告警）。新增 USAGE.md 完整手册与第 27 项回归用例
 
 - 修复版本：v1.2.0（2026-10-09）
+
+## EV-0010 显性调用口令太长记不住，缺少最短口令表
+
+- 日期：2026-10-09 . 类别：usability . 严重度：medium . 状态：applied . 发现于：v1.2.0
+- 相关项目：haiwai-bianxian
+- 复现命令：让用户凭记忆说出调用方式
+- 证据：SKILL.md 与全局托管块中只有完整句式，无短口令；用户反馈记不住
+
+**症状 / 期望**
+
+```
+**现象**：显性调用方式要求用户说出"使用 project-journal skill 跟踪这个项目"这类完整句，
+既长又难记 —— 结果是用户宁愿不用显性调用，技能的可发现性下降。
+
+**根因**：口令设计以"描述清楚"为目标，而不是以"用户记得住"为目标。
+文档里给的是完整句子，没有给出**一组最短口令**；全局指令托管块也没有以口令开头。
+
+**修复方向**：
+1. 固定 6 个词组作为覆盖全生命周期的口令，且每个词都直接对应一条底层命令
+2. 三个地方同步：SKILL.md（含 frontmatter description 触发词）、references/00-protocol.md（随 upgrade 分发到各项目）、
+   install-global.py 的全局托管块（所有工具的全局指令首屏就是口令表）
+3. 补回归用例：全局托管块里必须出现主口令，防止以后改文档时把它弄丢
+
+**口令表**：跟踪项目 / 记一下 / 项目状态 / 复盘 / 结项 / 出资产
+```
+
+**修复**
+
+新增最短口令表：跟踪项目 / 记一下 / 项目状态 / 复盘 / 结项 / 出资产（词组即命令，覆盖全生命周期），并同步写入 SKILL.md（含 frontmatter 触发词）、references/00-protocol.md（随 upgrade 分发到各项目）与 install-global.py 的全局托管块（所有工具全局指令首屏即为口令表）；补第 28 项回归用例防止口令表丢失
+
+- 修复版本：v1.2.1（2026-10-09）
