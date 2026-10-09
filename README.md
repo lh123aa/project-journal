@@ -182,7 +182,17 @@ python scripts/journal.py doctor
 
 ## 授权
 
-**Creative Commons Attribution-NonCommercial 4.0 International（CC BY-NC 4.0）**，全文见 [LICENSE](LICENSE)。
+**Creative Commons Attribution-NonCommercial 4.0 International（CC BY-NC 4.0）**
+
+`
+SPDX-License-Identifier: CC-BY-NC-4.0
+`
+
+全文见 [LICENSE](LICENSE)（SPDX 规范文本）。
+
+> ℹ️ **为什么 GitHub 侧边栏显示 "Other"**：GitHub 的授权模板库不含 CC BY-NC 系列
+> （`GET /licenses/cc-by-nc-4.0` 返回 404），所以**任何文本**都不会被识别成该许可 —— 这是平台限制，不是授权没设置。
+> 授权以 [LICENSE](LICENSE) 全文为准；第三方授权扫描器（ScanCode / FOSSA / SBOM 工具）可按上面的 SPDX 标识识别。
 
 | | |
 |---|---|

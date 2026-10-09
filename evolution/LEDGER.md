@@ -1,10 +1,10 @@
 # 自我迭代台账 . project-journal
 
-> 由 journal.py 自动生成（2026-10-09T11:48:41），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
+> 由 journal.py 自动生成（2026-10-09T11:49:34），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
 > 用途：记录本 skill 自身在运行中暴露的 bug / 逻辑问题 / 易用性问题及修订历史。
 > 闭环流程与治理规则见 references/08-self-evolution.md。
 
-- 当前版本：v1.3.0 . 条目 12 条 (applied 12)
+- 当前版本：v1.3.1 . 条目 13 条 (applied 13)
 
 | ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |
 |---|---|---|---|---|---|---|
@@ -20,6 +20,7 @@
 | EV-0010 | 2026-10-09 | usability | medium | applied | 显性调用口令太长记不住，缺少最短口令表 | 1.2.1 |
 | EV-0011 | 2026-10-09 | bug | medium | applied | 全局托管块里出现未转换的 @@ 占位符（转换函数本身被写坏） | 1.2.2 |
 | EV-0012 | 2026-10-09 | docs | high | applied | MIT 授权允许他人商用，与不允许商用的要求冲突 | 1.3.0 |
+| EV-0013 | 2026-10-09 | usability | medium | applied | GitHub 无法识别 CC BY-NC 授权（平台模板库缺失），且用的是 CC legalcode 而非 SPDX 规范文本 | 1.3.1 |
 
 ## EV-0001 案例研究缺少「关键认知与讨论」车道，insight 正文进不了资产包
 
@@ -346,3 +347,36 @@ NC 条款不允许商业使用，商业授权权利保留给著作权人（可�
 授权从 MIT 改为 CC BY-NC 4.0（禁止商用）：LICENSE 换为官方 legalcode 全文，README 顶部与授权段写明允许/禁止清单与商用需另行授权并声明历史版本（<=v1.2.2）仍为 MIT、授权不可撤回；manifest 增加 license 字段；新增回归用例（第 30 项）断言授权为非商用且 LICENSE 与 manifest 一致
 
 - 修复版本：v1.3.0（2026-10-09）
+
+## EV-0013 GitHub 无法识别 CC BY-NC 授权（平台模板库缺失），且用的是 CC legalcode 而非 SPDX 规范文本
+
+- 日期：2026-10-09 . 类别：usability . 严重度：medium . 状态：applied . 发现于：v1.3.0
+- 相关项目：haiwai-bianxian
+- 复现命令：curl -s https://api.github.com/licenses/cc-by-nc-4.0
+- 证据：GET /licenses/cc-by-nc-4.0 -> 404；GET /repos/... -> license.spdx_id=NOASSERTION
+
+**症状 / 期望**
+
+```
+**现象**：LICENSE 改为 CC BY-NC 4.0 并推送后，GitHub 仓库侧边栏与 API 显示：
+@@license: NOASSERTION / Other@@ —— 用户期望"在 GitHub 上设置"可见的授权标识。
+
+**根因（已实测）**：GitHub 的授权模板库**没有** CC BY-NC 系列：
+@@GET /licenses/cc-by-nc-4.0 -> 404@@，@@cc-by-nc-sa-4.0 -> 404@@，而 @@cc-by-4.0 / cc0-1.0 -> 200@@。
+即：**任何**文本都不会被识别成 CC BY-NC，这不是文本问题，是平台限制。
+
+**附带发现**：当前用的是 CC 官方 legalcode.txt（19343 字符），与 SPDX 规范文本（17609 字符）不同。
+第三方授权扫描器（ScanCode / FOSSA / SBOM 工具）以 SPDX 文本为识别基准，用 SPDX 文本识别率更高。
+
+**修复方向**：
+1. LICENSE 换成 SPDX 规范全文，提高生态工具识别率（GitHub 侧边栏仍会是 Other，无法解决）
+2. README 写明 @@SPDX-License-Identifier: CC-BY-NC-4.0@@，并诚实说明 GitHub 徽章不支持该许可、以 LICENSE 全文为准
+3. 用仓库描述与 README 顶部承担"可见的禁止商用"信号（GitHub 侧唯一可行的做法）
+4. 回归断言：LICENSE 必须含 SPDX 规范的标题格式与 NonCommercial
+```
+
+**修复**
+
+LICENSE 换为 SPDX 规范全文并写明 SPDX-License-Identifier: CC-BY-NC-4.0；README 诚实说明 GitHub 徽章不支持 CC BY-NC（模板库 404，任何文本都识别不了，非配置问题），授权以 LICENSE 全文为准；回归断言升级为 SPDX 标题 + manifest + README 标识三者一致
+
+- 修复版本：v1.3.1（2026-10-09）

@@ -5,6 +5,11 @@
 
 <!-- CHANGELOG:INSERT -->
 
+## [1.3.1] - 2026-10-09
+- LICENSE 换为 SPDX 规范全文并写明 SPDX-License-Identifier: CC-BY-NC-4.0；README 诚实说明 GitHub 徽章不支持 CC BY-NC（模板库 404，任何文本都识别不了，非配置问题），授权以 LICENSE 全文为准；回归断言升级为 SPDX 标题 + manifest + README 标识三者一致（EV-0013）
+- 类别 / 严重度：usability / medium
+- 台账：evolution/LEDGER.md 的 EV-0013
+
 ## [1.3.0] - 2026-10-09
 - 授权从 MIT 改为 CC BY-NC 4.0（禁止商用）：LICENSE 换为官方 legalcode 全文，README 顶部与授权段写明允许/禁止清单与商用需另行授权并声明历史版本（<=v1.2.2）仍为 MIT、授权不可撤回；manifest 增加 license 字段；新增回归用例（第 30 项）断言授权为非商用且 LICENSE 与 manifest 一致（EV-0012）
 - 类别 / 严重度：docs / high

@@ -218,9 +218,12 @@ def main():
         skill_md = r(os.path.join(SKILL_DIR, "SKILL.md"))
         lic_txt = r(os.path.join(SKILL_DIR, "LICENSE"))
         mf = json.loads(r(os.path.join(SKILL_DIR, "manifest.json")))
-        check("授权为非商用，且 LICENSE 与 manifest 一致（EV-0012）",
+        spdx_md = r(os.path.join(SKILL_DIR, "README.md"))
+        check("授权为非商用：SPDX 文本 + manifest + README 标识一致（EV-0012/0013）",
               "NonCommercial" in lic_txt and "MIT License" not in lic_txt
-              and str(mf.get("license", "")).startswith("CC-BY-NC"),
+              and "Creative Commons Attribution-NonCommercial 4.0 International" in lic_txt
+              and str(mf.get("license", "")).startswith("CC-BY-NC")
+              and "SPDX-License-Identifier: CC-BY-NC-4.0" in spdx_md,
               "license=%s len=%d" % (mf.get("license"), len(lic_txt)))
         check("全局托管块无未转换占位符 @@（EV-0011）",
               "@@" not in codex_md, [l for l in codex_md.splitlines() if "@@" in l][:2])
