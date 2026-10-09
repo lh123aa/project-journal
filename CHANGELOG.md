@@ -5,6 +5,11 @@
 
 <!-- CHANGELOG:INSERT -->
 
+## [1.3.3] - 2026-10-09
+- 修复 add 可用 --id 重复建档的问题：此前只校验同名文件是否存在，若 ID 已被占用但文件名不同（如已有 MS-0001-bootstrap.md 时再建 MS-0001-xxx.md）就会生成两份同 ID 档案；现在改为按 ID 全局查重并拒绝，错误信息直接给出 update 的两种用法，另加 --force 逃生口。新增第 32 项回归用例（EV-0014）
+- 类别 / 严重度：schema / low
+- 台账：evolution/LEDGER.md 的 EV-0014
+
 ## [1.3.2] - 2026-10-09
 - 修复 README 两处文档缺陷：SPDX 标识改为规范围栏代码块；版本段不再硬编码版本号与缺陷统计（改为指向 manifest/CHANGELOG/LEDGER 单一来源），并新增回归断言禁止 README 再出现硬编码版本号（第 31 项）（EV-0015）
 - 类别 / 严重度：docs / low

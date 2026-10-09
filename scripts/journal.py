@@ -951,9 +951,17 @@ def cmd_add(args):
     created_path = ""
     if rtype in RECORD_TYPES:
         rid = args.id or next_record_id(root, rtype)
+        # ID 全局唯一：已存在任何同 ID 档案就拒绝新建，避免出现"同 ID 两份不同正文"
+        existing = find_record_path(root, rid)
+        if existing and not args.force:
+            die("ID 已被占用：%s -> %s\n"
+                "  · 补充内容： journal.py update --root \"<记录根>\" --id %s --append-file <文件>\n"
+                "  · 修改状态： journal.py update --root \"<记录根>\" --id %s --status <状态>\n"
+                "  · 确实要新建：留空 --id 自动分配下一个，或加 --force 强制创建"
+                % (rid, rel(root, existing), rid, rid))
         path = os.path.join(root, "records", RECORD_DIR[rtype], "%s-%s.md" % (rid, slugify(title, "record", 40)))
         if os.path.exists(path):
-            die("档案已存在：%s" % path)
+            die("档案路径已存在：%s（用 update 追加，或加 --force）" % path)
         default_status = "open" if rtype in ("problem", "risk", "experiment", "question") else ("accepted" if rtype == "decision" else "done")
         meta = {"id": rid, "type": rtype, "project": t.get("slug", ""), "title": title,
                 "date": date, "status": args.status or default_status,
@@ -1884,6 +1892,7 @@ def build_parser():
     s.add_argument("--status", default="")
     s.add_argument("--confidence", default="medium")
     s.add_argument("--id", default="")
+    s.add_argument("--force", action="store_true", help="允许覆盖已占用的 ID（默认拒绝）")
 
     s = add("update", "更新已有档案（状态/追加内容）")
     s.add_argument("--id", required=True)

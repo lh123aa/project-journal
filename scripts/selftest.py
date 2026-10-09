@@ -144,6 +144,11 @@ def main():
         rc, out = run(["resume", "--root", root])
         check("resume 输出补液包", rc == 0 and "RESUME PACK" in out and "S5" in out, out[:300])
 
+        rc1, out1 = run(["add", "--root", root, "--type", "milestone", "--title", "重复ID用例", "--id", "MS-0001"])
+        rc2, out2 = run(["add", "--root", root, "--type", "milestone", "--title", "另一个标题", "--id", "MS-0001"])
+        check("拒绝重复 ID 建档，并提示用 update（EV-0014）",
+              rc1 == 0 and rc2 != 0 and "已被占用" in out2 and "update" in out2, out2[-260:])
+
         rc, out = run(["lint", "--root", root])
         check("干净项目 lint 通过", rc == 0, out[-400:])
         check("干净项目 lint 不产生误报 [EVOLVE]（EV-0008）",

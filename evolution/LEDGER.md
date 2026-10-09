@@ -1,10 +1,10 @@
 # 自我迭代台账 . project-journal
 
-> 由 journal.py 自动生成（2026-10-09T11:50:41），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
+> 由 journal.py 自动生成（2026-10-09T11:53:35），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
 > 用途：记录本 skill 自身在运行中暴露的 bug / 逻辑问题 / 易用性问题及修订历史。
 > 闭环流程与治理规则见 references/08-self-evolution.md。
 
-- 当前版本：v1.3.2 . 条目 15 条 (applied 14 . open 1)
+- 当前版本：v1.3.3 . 条目 15 条 (applied 15)
 
 | ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |
 |---|---|---|---|---|---|---|
@@ -21,7 +21,7 @@
 | EV-0011 | 2026-10-09 | bug | medium | applied | 全局托管块里出现未转换的 @@ 占位符（转换函数本身被写坏） | 1.2.2 |
 | EV-0012 | 2026-10-09 | docs | high | applied | MIT 授权允许他人商用，与不允许商用的要求冲突 | 1.3.0 |
 | EV-0013 | 2026-10-09 | usability | medium | applied | GitHub 无法识别 CC BY-NC 授权（平台模板库缺失），且用的是 CC legalcode 而非 SPDX 规范文本 | 1.3.1 |
-| EV-0014 | 2026-10-09 | schema | low | open | add --body-file 与 --id 一起用会重复生成记录文件 | - |
+| EV-0014 | 2026-10-09 | schema | low | applied | add --body-file 与 --id 一起用会重复生成记录文件 | 1.3.3 |
 | EV-0015 | 2026-10-09 | docs | low | applied | README 代码块渲染错误 + 版本号与缺陷数硬编码漂移 | 1.3.2 |
 
 ## EV-0001 案例研究缺少「关键认知与讨论」车道，insight 正文进不了资产包
@@ -385,9 +385,15 @@ LICENSE 换为 SPDX 规范全文并写明 SPDX-License-Identifier: CC-BY-NC-4.0�
 
 ## EV-0014 add --body-file 与 --id 一起用会重复生成记录文件
 
-- 日期：2026-10-09 . 类别：schema . 严重度：low . 状态：open . 发现于：v1.3.1
+- 日期：2026-10-09 . 类别：schema . 严重度：low . 状态：applied . 发现于：v1.3.1
 - 相关项目：-
 - 证据：add --id MS-0001 --body-file MS-0001-bootstrap.md 后, 脚本又生成 MS-0001-vbs.md 同名不同正文
+
+**修复**
+
+修复 add 可用 --id 重复建档的问题：此前只校验同名文件是否存在，若 ID 已被占用但文件名不同（如已有 MS-0001-bootstrap.md 时再建 MS-0001-xxx.md）就会生成两份同 ID 档案；现在改为按 ID 全局查重并拒绝，错误信息直接给出 update 的两种用法，另加 --force 逃生口。新增第 32 项回归用例
+
+- 修复版本：v1.3.3（2026-10-09）
 
 ## EV-0015 README 代码块渲染错误 + 版本号与缺陷数硬编码漂移
 
