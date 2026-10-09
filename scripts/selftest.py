@@ -219,6 +219,9 @@ def main():
         lic_txt = r(os.path.join(SKILL_DIR, "LICENSE"))
         mf = json.loads(r(os.path.join(SKILL_DIR, "manifest.json")))
         spdx_md = r(os.path.join(SKILL_DIR, "README.md"))
+        check("README 不硬编码版本号（EV-0014）",
+              not re.search(r"当前\s*[\x60]?v[0-9]+\.[0-9]+\.[0-9]+", spdx_md),
+              [l for l in spdx_md.splitlines() if "当前" in l][:2])
         check("授权为非商用：SPDX 文本 + manifest + README 标识一致（EV-0012/0013）",
               "NonCommercial" in lic_txt and "MIT License" not in lic_txt
               and "Creative Commons Attribution-NonCommercial 4.0 International" in lic_txt

@@ -1,10 +1,10 @@
 # 自我迭代台账 . project-journal
 
-> 由 journal.py 自动生成（2026-10-09T11:49:34），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
+> 由 journal.py 自动生成（2026-10-09T11:50:41），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
 > 用途：记录本 skill 自身在运行中暴露的 bug / 逻辑问题 / 易用性问题及修订历史。
 > 闭环流程与治理规则见 references/08-self-evolution.md。
 
-- 当前版本：v1.3.1 . 条目 13 条 (applied 13)
+- 当前版本：v1.3.2 . 条目 15 条 (applied 14 . open 1)
 
 | ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |
 |---|---|---|---|---|---|---|
@@ -21,6 +21,8 @@
 | EV-0011 | 2026-10-09 | bug | medium | applied | 全局托管块里出现未转换的 @@ 占位符（转换函数本身被写坏） | 1.2.2 |
 | EV-0012 | 2026-10-09 | docs | high | applied | MIT 授权允许他人商用，与不允许商用的要求冲突 | 1.3.0 |
 | EV-0013 | 2026-10-09 | usability | medium | applied | GitHub 无法识别 CC BY-NC 授权（平台模板库缺失），且用的是 CC legalcode 而非 SPDX 规范文本 | 1.3.1 |
+| EV-0014 | 2026-10-09 | schema | low | open | add --body-file 与 --id 一起用会重复生成记录文件 | - |
+| EV-0015 | 2026-10-09 | docs | low | applied | README 代码块渲染错误 + 版本号与缺陷数硬编码漂移 | 1.3.2 |
 
 ## EV-0001 案例研究缺少「关键认知与讨论」车道，insight 正文进不了资产包
 
@@ -380,3 +382,45 @@ NC 条款不允许商业使用，商业授权权利保留给著作权人（可�
 LICENSE 换为 SPDX 规范全文并写明 SPDX-License-Identifier: CC-BY-NC-4.0；README 诚实说明 GitHub 徽章不支持 CC BY-NC（模板库 404，任何文本都识别不了，非配置问题），授权以 LICENSE 全文为准；回归断言升级为 SPDX 标题 + manifest + README 标识三者一致
 
 - 修复版本：v1.3.1（2026-10-09）
+
+## EV-0014 add --body-file 与 --id 一起用会重复生成记录文件
+
+- 日期：2026-10-09 . 类别：schema . 严重度：low . 状态：open . 发现于：v1.3.1
+- 相关项目：-
+- 证据：add --id MS-0001 --body-file MS-0001-bootstrap.md 后, 脚本又生成 MS-0001-vbs.md 同名不同正文
+
+## EV-0015 README 代码块渲染错误 + 版本号与缺陷数硬编码漂移
+
+- 日期：2026-10-09 . 类别：docs . 严重度：low . 状态：applied . 发现于：v1.3.1
+- 相关项目：haiwai-bianxian
+- 复现命令：正则 ^当前 .v[0-9] 与 manifest 比对
+- 证据：README.md:187-189 三行孤立反引号；README.md:181 写 v1.1.3 与实际 v1.3.1 不符
+
+**症状 / 期望**
+
+```
+**现象（两处文档缺陷）**
+
+1. README 授权段里 SPDX 标识本该是围栏代码块，实际渲染成三行孤立反引号：
+@@
+@@@@
+SPDX-License-Identifier: CC-BY-NC-4.0
+@@@@
+@@
+原因：编辑时占位符先被转成单反引号，随后的"三反引号"替换已无可替换对象。
+
+2. README「版本」段硬编码 @@当前 v1.1.3@@ 与 @@累计修复 8 个真实缺陷@@，
+   而实际已是 v1.3.1 / 13 条 —— 典型的手写文档漂移。
+   讽刺的是：这个项目就是为了对抗"信息过期"，自己的 README 却漂了。
+
+**修复方向**
+1. SPDX 标识改为规范围栏代码块
+2. README 不再硬编码版本号与统计数字，改为指向单一来源（CHANGELOG / evolution/LEDGER.md）
+3. 补回归断言：README 不得再出现硬编码的 @@当前 vX.Y.Z@@（防止漂移复发）
+```
+
+**修复**
+
+修复 README 两处文档缺陷：SPDX 标识改为规范围栏代码块；版本段不再硬编码版本号与缺陷统计（改为指向 manifest/CHANGELOG/LEDGER 单一来源），并新增回归断言禁止 README 再出现硬编码版本号（第 31 项）
+
+- 修复版本：v1.3.2（2026-10-09）

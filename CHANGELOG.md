@@ -5,6 +5,11 @@
 
 <!-- CHANGELOG:INSERT -->
 
+## [1.3.2] - 2026-10-09
+- 修复 README 两处文档缺陷：SPDX 标识改为规范围栏代码块；版本段不再硬编码版本号与缺陷统计（改为指向 manifest/CHANGELOG/LEDGER 单一来源），并新增回归断言禁止 README 再出现硬编码版本号（第 31 项）（EV-0015）
+- 类别 / 严重度：docs / low
+- 台账：evolution/LEDGER.md 的 EV-0015
+
 ## [1.3.1] - 2026-10-09
 - LICENSE 换为 SPDX 规范全文并写明 SPDX-License-Identifier: CC-BY-NC-4.0；README 诚实说明 GitHub 徽章不支持 CC BY-NC（模板库 404，任何文本都识别不了，非配置问题），授权以 LICENSE 全文为准；回归断言升级为 SPDX 标题 + manifest + README 标识三者一致（EV-0013）
 - 类别 / 严重度：usability / medium

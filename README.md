@@ -178,15 +178,18 @@ python scripts/journal.py doctor
 
 ## 版本
 
-当前 `v1.1.3`。修复历史见 `evolution/LEDGER.md` 与 `CHANGELOG.md` —— 项目从 v1.0.0 起累计记录并修复 8 个真实缺陷（含"案例研究缺少认知车道"、"upgrade 无法刷新旧项目"、"lint 正则误报"等），每条都有复现与回归用例。
+**最新版本以 [manifest.json](manifest.json) 为准，变更历史见 [CHANGELOG.md](CHANGELOG.md)，修复台账见 [evolution/LEDGER.md](evolution/LEDGER.md)。**
+
+> 本 README 刻意不写死版本号与统计数字 —— 手写的数字一定会过期，单一来源不会。
+> 从 v1.0.0 至今累计修复的真实缺陷（含「案例研究缺少认知车道」「upgrade 无法刷新旧项目」「lint 误报」「全局块占位符泄漏」）每条都有复现与回归用例。
 
 ## 授权
 
 **Creative Commons Attribution-NonCommercial 4.0 International（CC BY-NC 4.0）**
 
-`
+```
 SPDX-License-Identifier: CC-BY-NC-4.0
-`
+```
 
 全文见 [LICENSE](LICENSE)（SPDX 规范文本）。
 
