@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "skill": "project-journal",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "entries": [
     {
       "id": "EV-0001",
@@ -171,6 +171,23 @@
       "skill_version": "1.2.0",
       "fingerprint": "20ca3b7e854d",
       "version": "1.2.1",
+      "resolution_date": "2026-10-09"
+    },
+    {
+      "id": "EV-0011",
+      "date": "2026-10-09",
+      "category": "bug",
+      "severity": "medium",
+      "status": "applied",
+      "title": "全局托管块里出现未转换的 @@ 占位符（转换函数本身被写坏）",
+      "symptom": "**现象**：在 Codex / Gemini 等工具的全局指令文件里，口令表这一行渲染成了字面占位符：\n\n    首次：init（记录目录 = @@<项目根>/project-journal/@@）；已存在：resume\n\n期望是行内代码（反引号）。\n\n**根因**：install-global.py 第 104 行的占位符转换本身被写坏了 ——\n源码里本应是 @@.replace(\"@@\", chr(96))@@，但在生成该文件时同样经过了 `@@ -> 反引号` 的转换，\n落盘变成了 @@.replace(\"`\", chr(96))@@（把反引号换成反引号，恒等操作）。\n于是\"运行期把 @@ 转成反引号\"这条路径失效；历史内容之所以看起来正常，是因为它们的反引号在**生成文件时**就已经被替换好了。\n\n**影响面**：所有注入全局指令的工具（Claude Code / Codex / Gemini / opencode / Windsurf），\n用户第一眼看到的就是占位符噪音，降低了口令表的可信度。\n\n**修复方向**：去掉恒等的 replace；表格行直接使用真实反引号；\n并补一条回归用例断言\"注入结果中不得出现 @@\"，防止同类占位符再次泄漏到用户可见文件。",
+      "evidence": "install-global.py:104 replace(`, chr(96)) 为恒等操作；.codex/AGENTS.md:8 与 .gemini/GEMINI.md:11 出现 @@<项目根>/project-journal/@@",
+      "repro": "python scripts/install-global.py 后查看 ~/.codex/AGENTS.md",
+      "project": "haiwai-bianxian",
+      "fix": "修复全局托管块泄漏 @@ 占位符：install-global.py 的占位符转换函数此前被写坏成恒等操作，导致运行期 @@ 转反引号失效；删除该恒等转换、表格行改用真实反引号，并新增回归断言（注入结果不得出现 @@，第 29 项）",
+      "skill_version": "1.2.1",
+      "fingerprint": "eb7e9ec94c63",
+      "version": "1.2.2",
       "resolution_date": "2026-10-09"
     }
   ]

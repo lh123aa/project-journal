@@ -77,7 +77,7 @@ def global_block(skill_dir):
         "",
         "| 用户说 | 你做什么 |",
         "|---|---|",
-        "| 跟踪项目 / 跟踪 <项目名> | 首次：init（记录目录 = @@<项目根>/project-journal/@@）；已存在：resume |",
+        "| 跟踪项目 / 跟踪 <项目名> | 首次：init（记录目录 = `<项目根>/project-journal/`）；已存在：resume |",
         "| 记一下 / 记录一下 | 把本次会话的增量落盘（决策 / 问题 / 解法 / 认知 / 数字） |",
         "| 项目状态 | status 一行体检 |",
         "| 复盘 | review 生成周 / 月复盘骨架 |",
@@ -101,7 +101,7 @@ def global_block(skill_dir):
         "禁止写入密钥与隐私；不编造数字；区分事实与判断。",
         END,
         "",
-    ]).replace("`", chr(96))
+    ])
 
 
 def inject(path, block, apply_changes):
