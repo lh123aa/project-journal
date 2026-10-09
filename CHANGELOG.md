@@ -1,0 +1,38 @@
+# CHANGELOG . project-journal
+
+> 版本号遵循语义化：`patch` 修错 / `minor` 加能力或扩展格式（向后兼容）/ `major` 破坏兼容。
+> 每一项修复都对应 `evolution/LEDGER.md` 里的一个 EV 编号；任何修复都必须通过 `scripts/selftest.py` 才能发布。
+
+<!-- CHANGELOG:INSERT -->
+
+## [1.1.3] - 2026-10-09
+- 修正 lint 中丢失反斜杠的日记文件名正则（把合规文件误报为结构性问题），并规范一处未转义的点号；selftest 新增断言：干净项目的 lint 输出不得包含 [EVOLVE]（含误报即失败）（EV-0008）
+- 类别 / 严重度：bug / medium
+- 台账：evolution/LEDGER.md 的 EV-0008
+
+## [1.1.2] - 2026-10-09
+- 记录目录约定改为项目根下的子文件夹 <项目根>/project-journal（去掉冗余 slug 层），SKILL.md/references 同步；guess_project_root 改为约定优先，不再向上越过项目去命中上级 .git，避免把会话锚点注入到无关仓库；新增 2 项回归用例（锚点不被劫持、cwd 默认位置）（EV-0007）
+- 类别 / 严重度：logic / medium
+- 台账：evolution/LEDGER.md 的 EV-0007
+
+## [1.1.1] - 2026-10-09
+- upgrade 改为先备份再刷新工具生成的 PROTOCOL.md（新增 --keep-protocol 逃生口），消除旧项目永远无法清掉的 [EVOLVE] 提示；补充回归用例（第 23 项）（EV-0006）
+- 类别 / 严重度：logic / medium
+- 台账：evolution/LEDGER.md 的 EV-0006
+
+## [1.1.0] - 2026-10-09
+- 新增自我迭代子系统：evolve/evolve-list/evolve-apply/doctor/upgrade 五个命令、崩溃自动记录、lint 结构性问题检测（--auto-evolve）、22 项回归自测门禁 selftest.py、CHANGELOG 与语义化版本治理、PROTOCOL 契约版本与安全迁移（upgrade 不动历史记录），并补 references/08-self-evolution.md 与 SKILL.md 第 8 节（EV-0005）
+- 类别 / 严重度：feature / high
+- 台账：evolution/LEDGER.md 的 EV-0005
+
+## [1.0.1] - 2026-10-09
+- 案例研究新增「关键认知与讨论」车道，有价值讨论（insight）正文进入资产包（EV-0001）
+- 问题↔解法改为按 links 双向配对，解法不再漏进案例研究（EV-0002）
+- 重复 init 不再误报「补全 CHARTER」，改为提示已有目录的开工程序（EV-0003）
+- NEXT-ACTIONS 模板去掉空 checkbox，STATE 不再出现空条目（EV-0004）
+
+## [1.0.0] - 2026-10-09
+- 首个版本：init / anchor / status / resume / add / update / metric / ledger / stage / index /
+  lint / review / closeout / publish / vault-index
+- 三层结构（append-only 日记 / 主题档案 / 数据表）+ 会话锚点 + 项目契约 PROTOCOL.md
+- MUST-RECORD 触发器、成功线与止损线预置、阶段机、脱敏可销售资产包
