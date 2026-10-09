@@ -4,8 +4,9 @@
 
 [English](#english) ｜ 中文
 
-> **授权：CC BY-NC 4.0** —— 个人学习、研究、非营利场景免费使用；
-> **任何商业用途（含内部商用、对外提供付费服务、打包进商业产品）均需另行获得授权**。
+> **双轨授权（v1.4.0 起）**
+> - **个人 / 非商业**：CC BY-NC 4.0，免费 —— 学习、研究、教学、非营利内部使用
+> - **商业 / 企业**：[LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) —— 个人商用 ¥99 / 小团队 ¥299 / 企业 ¥3k–10k
 > 详见文末 [授权](#授权)。
 
 ```
@@ -153,7 +154,7 @@ CHANGELOG.md                  语义化版本变更日志
 references/                   00 契约 / 01 分类法 / 02 写作指南 / 03 节奏 /
                               04 变现追踪 / 05 终止复盘 / 06 资产化 / 07 排障 / 08 自我迭代
 scripts/journal.py            引擎（stdlib only，约 90KB）
-scripts/selftest.py           回归自测（26 项，发布门禁）
+scripts/selftest.py           回归自测（发布门禁）
 templates/                    CHARTER / NEXT-ACTIONS / 各类记录蓝图 / 日记条目
 evolution/                    自我迭代台账（ledger.json + LEDGER.md）
 ```
@@ -185,30 +186,38 @@ python scripts/journal.py doctor
 
 ## 授权
 
-**Creative Commons Attribution-NonCommercial 4.0 International（CC BY-NC 4.0）**
+### 双轨
+
+| 轨 | 协议 | 费用 | 适用 |
+|---|---|---|---|
+| 免费轨 | [CC BY-NC 4.0](LICENSE) | ¥0 | 个人学习、研究、教学、非营利内部使用 |
+| 商业轨 | [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) | ¥99 / ¥299 / ¥3k–10k | 公司商用、SaaS 集成、白标、内训、对外付费服务 |
+
+**CC BY-NC 4.0 标识**
 
 ```
 SPDX-License-Identifier: CC-BY-NC-4.0
 ```
 
-全文见 [LICENSE](LICENSE)（SPDX 规范文本）。
-
-> ℹ️ **为什么 GitHub 侧边栏显示 "Other"**：GitHub 的授权模板库不含 CC BY-NC 系列
-> （`GET /licenses/cc-by-nc-4.0` 返回 404），所以**任何文本**都不会被识别成该许可 —— 这是平台限制，不是授权没设置。
-> 授权以 [LICENSE](LICENSE) 全文为准；第三方授权扫描器（ScanCode / FOSSA / SBOM 工具）可按上面的 SPDX 标识识别。
+**CC BY-NC 4.0（SPDX：CC-BY-NC-4.0）摘要**
 
 | | |
 |---|---|
 | ✅ 允许 | 个人学习与使用；研究与教学；非营利组织内部使用；修改并分享（需署名、需保持相同授权、需注明改动） |
 | ❌ 禁止 | 任何**商业用途**：公司内部业务使用、对外提供付费服务、打包进商业产品、用于获客变现的商业内容、转售 |
-| ⚠️ 需授权 | 商业使用、企业内训、SaaS/产品集成、白标分发 —— 需另行获得书面授权 |
+| ⚠️ 需授权 | 商业使用、企业内训、SaaS/产品集成、白标分发 —— 走 [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) |
 
-**商用授权**：如需商业使用，请通过 GitHub 主页联系作者取得单独授权。
+> ℹ️ **为什么 GitHub 侧边栏显示 "Other"**：GitHub 的授权模板库不含 CC BY-NC 系列
+> （`GET /licenses/cc-by-nc-4.0` 返回 404），所以**任何文本**都不会被识别成该许可 —— 这是平台限制，不是授权没设置。
+> 授权以 [LICENSE](LICENSE) + [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) 为准；第三方授权扫描器（ScanCode / FOSSA / SBOM 工具）可按上面的 SPDX 标识识别。
+
+**商用授权申请**：填写 [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) 末尾的签署块，通过 GitHub 主页 / 即刻 / 邮箱联系作者；电子签署有效。
 
 ### 历史版本说明
 
-v1.2.2 及更早版本以 **MIT** 授权发布。已经获得的 MIT 授权**不可撤回**，那些版本对已获取者仍然有效；
-**自 v1.3.0 起，本仓库改用 CC BY-NC 4.0，禁止商用**。如需以 MIT 条款使用，请使用 v1.2.2；但请勿在新项目中继续沿用可商用授权。
+- **≤ v1.2.2**：MIT，**不可撤回**——已获取者可继续按 MIT 商用，无需签 LICENSE-COMMERCIAL
+- **≥ v1.3.0**：CC BY-NC 4.0（非营利免费 + 商用双轨）
+- **v1.4.0 起**：双轨授权正式生效，`manifest.json` 同步 `license_files` 字段
 
 ---
 

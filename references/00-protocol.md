@@ -116,7 +116,7 @@ journal.py stage --set S3 --why "拿到首单"
 journal.py status --root <本目录>            # 一行体检
 journal.py resume --root <本目录>            # 生成补液包
 journal.py add --type <T> --title "..." [--body-file f] [--tags a,b] [--link ADR-0001]
-journal.py update --id PB-0003 --status solved --append-file f.md
+journal.py update --id PB-0003 --status solved --append-file f.md   # --body-file 同义
 journal.py metric --name <> --value <> --unit <> [--source <>]
 journal.py ledger --kind income|cost --amount <> [--currency <>] [--channel <>]
 journal.py stage --set S1 --why "..."

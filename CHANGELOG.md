@@ -5,6 +5,21 @@
 
 <!-- CHANGELOG:INSERT -->
 
+## [1.4.0] - 2026-10-09
+- 授权双轨化：新增 `LICENSE-COMMERCIAL.md`（个人商用 ¥99 / 小团队 ¥299 / 企业 ¥3k–10k 三档授权书模板，含授权范围 / 源码约束 / 署名 / 期限 / 历史版本说明）；CC BY-NC 4.0 继续覆盖个人与非营利场景，商业方向（案例包付费 / 企业授权 / 白标分发）解锁。README 顶部与授权段改为双轨摘要，`manifest.json` 增加 `license_files` 字段并把 license 描述改为 "CC-BY-NC-4.0 + Commercial-License"。历史版本说明：≤v1.2.2 仍 MIT（不可撤回），≥v1.3.0 起双轨（EV-0018）
+- 类别 / 严重度：feature / high
+- 台账：evolution/LEDGER.md 的 EV-0018
+
+## [1.3.5] - 2026-10-09
+- EV-0016 修复：update 新增 --body-file 别名（与 add 命名对齐，与 --append-file 同义）；补 selftest 用例（EV-0016）
+- 类别 / 严重度：docs / low
+- 台账：evolution/LEDGER.md 的 EV-0016
+
+## [1.3.4] - 2026-10-09
+- EV-0017 修复：anchor 注入路径改为优先项目内 scripts/journal.py（相对路径），无项目内脚本时回退到本机脚本绝对路径；补 selftest 两用例（EV-0017）
+- 类别 / 严重度：schema / low
+- 台账：evolution/LEDGER.md 的 EV-0017
+
 ## [1.3.3] - 2026-10-09
 - 修复 add 可用 --id 重复建档的问题：此前只校验同名文件是否存在，若 ID 已被占用但文件名不同（如已有 MS-0001-bootstrap.md 时再建 MS-0001-xxx.md）就会生成两份同 ID 档案；现在改为按 ID 全局查重并拒绝，错误信息直接给出 update 的两种用法，另加 --force 逃生口。新增第 32 项回归用例（EV-0014）
 - 类别 / 严重度：schema / low

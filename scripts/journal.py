@@ -704,7 +704,13 @@ def guess_project_root(root):
 
 def anchor_block(root, project_root):
     r = os.path.relpath(root, project_root).replace(os.sep, "/")
-    script = os.path.join(HERE, "journal.py").replace(os.sep, "/")
+    # 锚点里的 journal.py 路径：若项目仓库内自带 scripts/journal.py（记录目录与脚本同库，
+    # 随 git 走、换机器后路径仍有效），写相对路径；否则写当前机器上脚本的实际位置（EV-0017）。
+    anchor_script = os.path.join(root, "scripts", "journal.py")
+    if not os.path.isfile(anchor_script):
+        anchor_script = os.path.join(HERE, "journal.py").replace(os.sep, "/")
+    else:
+        anchor_script = os.path.join(r, "scripts", "journal.py")
     return "\n".join([
         ANCHOR_BEGIN,
         "## 项目过程跟踪（project-journal . 自动维护块，请勿手工编辑）",
@@ -713,7 +719,7 @@ def anchor_block(root, project_root):
         "",
         "**每次会话必须遵守：**",
         "",
-        "1. **开工先读**：python \"%s\" resume --root \"%s\"" % (script, r),
+        "1. **开工先读**：python \"%s\" resume --root \"%s\"" % (anchor_script, r),
         "2. **收工前写**：把本次增量追加到当日日记 %s/journal/YYYY-MM-DD.md" % r,
         "   （决策 / 问题与解法 / 有价值的讨论 / 认知更新 / 真实数字 / 风险 / 里程碑）",
         "3. **有数字就进表**：journal.py metric ... 、journal.py ledger ...",
@@ -998,10 +1004,12 @@ def cmd_update(args):
         meta["status"] = args.status
     new_txt = fm_block(meta) + body.rstrip("\n") + "\n"
     add = ""
-    if args.append_file:
-        if not os.path.isfile(args.append_file):
-            die("--append-file 不存在：%s" % args.append_file)
-        add = read_text(args.append_file).strip()
+    # EV-0016：--body-file 与 --append-file 同义（与 add 命名对齐）；同时给定时 --body-file 优先。
+    append_path = args.body_file or args.append_file
+    if append_path:
+        if not os.path.isfile(append_path):
+            die("--body-file/--append-file 不存在：%s" % append_path)
+        add = read_text(append_path).strip()
         new_txt += "\n---\n\n## 更新 %s\n\n%s\n" % (now_iso()[:16].replace("T", " "), add)
     write_text(path, new_txt)
     append_daily(root, t, args.date or today_str(), "U",
@@ -1898,6 +1906,8 @@ def build_parser():
     s.add_argument("--id", required=True)
     s.add_argument("--status", default="")
     s.add_argument("--append-file", dest="append_file")
+    s.add_argument("--body-file", dest="body_file",
+                   help="正文文件：与 --append-file 相同，但命名与 add 对齐（EV-0016）")
     s.add_argument("--result", default="")
 
     s = add("metric", "记录一个指标")

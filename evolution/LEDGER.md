@@ -1,10 +1,10 @@
 # 自我迭代台账 . project-journal
 
-> 由 journal.py 自动生成（2026-10-09T11:53:35），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
+> 由 journal.py 自动生成（2026-10-09T13:32:40），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
 > 用途：记录本 skill 自身在运行中暴露的 bug / 逻辑问题 / 易用性问题及修订历史。
 > 闭环流程与治理规则见 references/08-self-evolution.md。
 
-- 当前版本：v1.3.3 . 条目 15 条 (applied 15)
+- 当前版本：v1.4.0 . 条目 18 条 (applied 18)
 
 | ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |
 |---|---|---|---|---|---|---|
@@ -23,6 +23,9 @@
 | EV-0013 | 2026-10-09 | usability | medium | applied | GitHub 无法识别 CC BY-NC 授权（平台模板库缺失），且用的是 CC legalcode 而非 SPDX 规范文本 | 1.3.1 |
 | EV-0014 | 2026-10-09 | schema | low | applied | add --body-file 与 --id 一起用会重复生成记录文件 | 1.3.3 |
 | EV-0015 | 2026-10-09 | docs | low | applied | README 代码块渲染错误 + 版本号与缺陷数硬编码漂移 | 1.3.2 |
+| EV-0016 | 2026-10-09 | docs | low | applied | update 子命令不支持 --body-file，补档案正文需手工写 records/ | 1.3.5 |
+| EV-0017 | 2026-10-09 | schema | low | applied | AGENTS.md anchor 注入的 journal.py 路径用了错误的旧根目录 | 1.3.4 |
+| EV-0018 | 2026-10-09 | docs | high | applied | 授权单轨 CC BY-NC 堵死 B/C/D 变现路径，需双轨化 | 1.4.0 |
 
 ## EV-0001 案例研究缺少「关键认知与讨论」车道，insight 正文进不了资产包
 
@@ -430,3 +433,39 @@ SPDX-License-Identifier: CC-BY-NC-4.0
 修复 README 两处文档缺陷：SPDX 标识改为规范围栏代码块；版本段不再硬编码版本号与缺陷统计（改为指向 manifest/CHANGELOG/LEDGER 单一来源），并新增回归断言禁止 README 再出现硬编码版本号（第 31 项）
 
 - 修复版本：v1.3.2（2026-10-09）
+
+## EV-0016 update 子命令不支持 --body-file，补档案正文需手工写 records/
+
+- 日期：2026-10-09 . 类别：docs . 严重度：low . 状态：applied . 发现于：v1.3.3
+- 相关项目：sage-counsel
+- 证据：journal.py update --id MS-0001 --body-file 报 unrecognized arguments；update 仅支持 --status/--append/--note
+
+**修复**
+
+EV-0016 修复：update 新增 --body-file 别名（与 add 命名对齐，与 --append-file 同义）；补 selftest 用例
+
+- 修复版本：v1.3.5（2026-10-09）
+
+## EV-0017 AGENTS.md anchor 注入的 journal.py 路径用了错误的旧根目录
+
+- 日期：2026-10-09 . 类别：schema . 严重度：low . 状态：applied . 发现于：v1.3.3
+- 相关项目：-
+- 证据：anchor 写 E:/程序/github/我的项目/project-journal/scripts/journal.py, 实际是 C:/Users/49046/.agents/skills/project-journal/scripts/journal.py
+
+**修复**
+
+EV-0017 修复：anchor 注入路径改为优先项目内 scripts/journal.py（相对路径），无项目内脚本时回退到本机脚本绝对路径；补 selftest 两用例
+
+- 修复版本：v1.3.4（2026-10-09）
+
+## EV-0018 授权单轨 CC BY-NC 堵死 B/C/D 变现路径，需双轨化
+
+- 日期：2026-10-09 . 类别：docs . 严重度：high . 状态：applied . 发现于：v1.3.5
+- 相关项目：project-journal-launch
+- 证据：变现评估结论：CC BY-NC 禁止商用，案例包付费 / 企业授权 / 白标分发 3 条路径全部被堵；README 顶部单轨说明不足以承接付费请求
+
+**修复**
+
+EV-0018 修复：新增 LICENSE-COMMERCIAL.md（A 个人 ¥99 / B 小团队 ¥299 / C 企业 ¥3k–10k 三档授权书模板，含授权范围 / 源码约束 / 署名 / 期限 / 历史版本说明）；README 授权段改双轨摘要；manifest.json 增加 license_files 字段并 bump 到 1.4.0
+
+- 修复版本：v1.4.0（2026-10-09）

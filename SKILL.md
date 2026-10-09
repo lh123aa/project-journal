@@ -210,6 +210,7 @@ anchor --root <记录根> --project-root <项目根>        # 重新注入/刷�
 status --root <根> [--json]                          # 一行体检：阶段/最后记录/停滞天数/未闭环
 resume --root <根>                                   # 生成"补液包"（新会话先跑这个）
 add --root <根> --type <类型> --title "标题" [--body-file f.md] [--tags a,b] [--link ADR-0001] [--status open] [--date D]
+update --root <根> --id <ID> [--status ...] [--body-file f.md | --append-file f.md] [--result ...]   # 更新档案；两文件参数同义
 metric --root <根> --name MRR --value 120 --unit USD [--source "Stripe"] [--confidence high]
 ledger --root <根> --kind income|cost --amount 99 --currency USD --channel "..." [--note "..."]
 stage  --root <根> --set S3 --why "拿到首单"

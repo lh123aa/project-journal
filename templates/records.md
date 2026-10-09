@@ -33,7 +33,7 @@ journal.py add --type decision --title "放弃 WhatsApp 渠道" --body-file d.md
 ```
 解决后回填：
 ```bash
-journal.py update --id PB-0003 --status solved --append-file solved.md
+journal.py update --id PB-0003 --status solved --append-file solved.md   # --body-file 同义
 ```
 
 ## solution（解法 / 打法）

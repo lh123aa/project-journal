@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "skill": "project-journal",
-  "version": "1.3.3",
+  "version": "1.3.5",
   "entries": [
     {
       "id": "EV-0001",
@@ -256,6 +256,57 @@
       "skill_version": "1.3.1",
       "fingerprint": "db40503ad213",
       "version": "1.3.2",
+      "resolution_date": "2026-10-09"
+    },
+    {
+      "id": "EV-0016",
+      "date": "2026-10-09",
+      "category": "docs",
+      "severity": "low",
+      "status": "applied",
+      "title": "update 子命令不支持 --body-file，补档案正文需手工写 records/",
+      "symptom": "",
+      "evidence": "journal.py update --id MS-0001 --body-file 报 unrecognized arguments；update 仅支持 --status/--append/--note",
+      "repro": "",
+      "project": "sage-counsel",
+      "fix": "EV-0016 修复：update 新增 --body-file 别名（与 add 命名对齐，与 --append-file 同义）；补 selftest 用例",
+      "skill_version": "1.3.3",
+      "fingerprint": "2705496fa8e4",
+      "version": "1.3.5",
+      "resolution_date": "2026-10-09"
+    },
+    {
+      "id": "EV-0017",
+      "date": "2026-10-09",
+      "category": "schema",
+      "severity": "low",
+      "status": "applied",
+      "title": "AGENTS.md anchor 注入的 journal.py 路径用了错误的旧根目录",
+      "symptom": "",
+      "evidence": "anchor 写 E:/程序/github/我的项目/project-journal/scripts/journal.py, 实际是 C:/Users/49046/.agents/skills/project-journal/scripts/journal.py",
+      "repro": "",
+      "project": "",
+      "fix": "EV-0017 修复：anchor 注入路径改为优先项目内 scripts/journal.py（相对路径），无项目内脚本时回退到本机脚本绝对路径；补 selftest 两用例",
+      "skill_version": "1.3.3",
+      "fingerprint": "f70174489392",
+      "version": "1.3.4",
+      "resolution_date": "2026-10-09"
+    },
+    {
+      "id": "EV-0018",
+      "date": "2026-10-09",
+      "category": "docs",
+      "severity": "high",
+      "status": "applied",
+      "title": "授权单轨 CC BY-NC 堵死 B/C/D 变现路径，需双轨化",
+      "symptom": "",
+      "evidence": "变现评估结论：CC BY-NC 禁止商用，案例包付费 / 企业授权 / 白标分发 3 条路径全部被堵；README 顶部单轨说明不足以承接付费请求",
+      "repro": "",
+      "project": "project-journal-launch",
+      "fix": "EV-0018 修复：新增 LICENSE-COMMERCIAL.md（A 个人 ¥99 / B 小团队 ¥299 / C 企业 ¥3k–10k 三档授权书模板，含授权范围 / 源码约束 / 署名 / 期限 / 历史版本说明）；README 授权段改双轨摘要；manifest.json 增加 license_files 字段并 bump 到 1.4.0",
+      "skill_version": "1.3.5",
+      "fingerprint": "ev0018-dual-license",
+      "version": "1.4.0",
       "resolution_date": "2026-10-09"
     }
   ]

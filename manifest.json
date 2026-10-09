@@ -1,6 +1,6 @@
 {
   "name": "project-journal",
-  "version": "1.3.3",
+  "version": "1.4.0",
   "category": "Project Tracking / Knowledge Assetization",
   "description": "Continuous project process tracking and experience-asset engine. One call bootstraps an independent Markdown record folder plus a session anchor in AGENTS.md; afterwards every session auto-resumes and captures decisions, problems, solutions, daily execution, metrics and revenue until monetization succeeds or fails, then publishes a redacted sellable case-study asset pack.",
   "compat": [
@@ -28,6 +28,10 @@
     "doc": "references/08-self-evolution.md",
     "gate": "scripts/selftest.py"
   },
-  "license": "CC-BY-NC-4.0",
-  "license_note": "个人与非商业用途免费；商业使用需另行获得授权（Commercial use requires a separate license）"
+  "license": "CC-BY-NC-4.0 + Commercial-License",
+  "license_note": "双轨授权：个人学习与非营利场景免费（CC BY-NC 4.0）；商业/企业使用走 LICENSE-COMMERCIAL.md 单独授权（Commercial use via LICENSE-COMMERCIAL.md）",
+  "license_files": [
+    "LICENSE",
+    "LICENSE-COMMERCIAL.md"
+  ]
 }

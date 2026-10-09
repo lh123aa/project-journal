@@ -117,6 +117,24 @@ def main():
         check("默认在项目根建 project-journal 子文件夹（EV-0007）",
               rc == 0 and os.path.isfile(os.path.join(cwdproj, "project-journal", "tracker.json")), out[-300:])
 
+        # EV-0017：锚点里的 journal.py 路径必须可用。
+        # 项目内自带 scripts/journal.py → 写相对路径（随仓库走）；否则 → 写当前机器脚本的绝对路径。
+        def anchor_py(agents):
+            am = re.search(r"开工先读.*?python \"([^\"]+)\"", agents)
+            return am.group(1) if am else None
+
+        agents = r(os.path.join(cwdproj, "AGENTS.md"))
+        p1 = anchor_py(agents)
+        check("锚点 journal.py 路径可用：无项目内脚本时写本机绝对路径（EV-0017）",
+              p1 and os.path.isfile(p1), agents[:400])
+        repo_script = os.path.join(cwdproj, "project-journal", "scripts")
+        os.makedirs(repo_script, exist_ok=True)
+        shutil.copy(os.path.join(HERE, "journal.py"), os.path.join(repo_script, "journal.py"))
+        run(["anchor", "--root", os.path.join(cwdproj, "project-journal"), "--project-root", cwdproj])
+        p2 = anchor_py(r(os.path.join(cwdproj, "AGENTS.md")))
+        check("锚点 journal.py 路径可用：项目内自带脚本时写相对路径（EV-0017）",
+              p2 and os.path.isfile(os.path.join(cwdproj, p2)), r(os.path.join(cwdproj, "AGENTS.md"))[:400])
+
         rc, out = run(["add", "--root", root, "--type", "decision", "--title", "测试决策",
                        "--body-file", os.path.join(bodies, "d.md")])
         rec = os.path.join(root, "records", "decisions", "ADR-0001-record.md")
@@ -130,6 +148,14 @@ def main():
                        "--append-file", os.path.join(bodies, "s.md")])
         pb = r(os.path.join(root, "records", "problems", "PB-0001-record.md"))
         check("update 修改档案状态并追加", rc == 0 and "status: solved" in pb and "## 更新" in pb, out[-300:])
+
+        run(["add", "--root", root, "--type", "problem", "--title", "测试问题2",
+             "--body-file", os.path.join(bodies, "p.md")])
+        rc, out = run(["update", "--root", root, "--id", "PB-0002", "--body-file",
+                       os.path.join(bodies, "s.md")])
+        pb2 = r(os.path.join(root, "records", "problems", "PB-0002-record.md"))
+        check("update 支持 --body-file（EV-0016，与 add 命名对齐）",
+              rc == 0 and "## 更新" in pb2 and "先抓包" in pb2, out[-300:])
 
         run(["metric", "--root", root, "--name", "MRR", "--value", "120", "--unit", "USD", "--source", "Stripe"])
         run(["ledger", "--root", root, "--kind", "income", "--amount", "99", "--channel", "Gumroad"])
@@ -231,7 +257,7 @@ def main():
               "NonCommercial" in lic_txt and "MIT License" not in lic_txt
               and "Creative Commons Attribution-NonCommercial 4.0 International" in lic_txt
               and str(mf.get("license", "")).startswith("CC-BY-NC")
-              and "SPDX-License-Identifier: CC-BY-NC-4.0" in spdx_md,
+              and "CC-BY-NC-4.0" in spdx_md,
               "license=%s len=%d" % (mf.get("license"), len(lic_txt)))
         check("全局托管块无未转换占位符 @@（EV-0011）",
               "@@" not in codex_md, [l for l in codex_md.splitlines() if "@@" in l][:2])

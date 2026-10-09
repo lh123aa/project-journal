@@ -115,7 +115,7 @@ python $S resume --root $R
 # ② 干活中：随时落盘
 python $S add --root $R --type decision --title "放弃 WhatsApp 渠道" --body-file d.md
 python $S add --root $R --type problem  --title "OAuth 回调丢 session" --body-file p.md
-python $S update --root $R --id PB-0001 --status solved --append-file fix.md   # 问题解决后回填
+python $S update --root $R --id PB-0001 --status solved --append-file fix.md   # 问题解决后回填（--body-file 同义，EV-0016）
 python $S add --root $R --type insight  --title "瓶颈是定价页不是流量" --body-file i.md
 python $S add --root $R --type lesson   --title "先收 10 个邮箱再写代码" --body-file l.md
 python $S metric --root $R --name MRR --value 120 --unit USD --source Stripe
@@ -151,7 +151,7 @@ python $S lint  --root $R
 | 立项 | `init --project "名称" --success ... --stop-loss ...` |
 | 开工 | `resume --root <R>` |
 | 记录 | `add --root <R> --type <类型> --title "..." [--body-file f] [--link ADR-0001]` |
-| 闭环问题 | `update --root <R> --id PB-0003 --status solved --append-file fix.md` |
+| 闭环问题 | `update --root <R> --id PB-0003 --status solved --append-file fix.md`（`--body-file` 同义） |
 | 数字 | `metric` / `ledger` |
 | 阶段 | `stage --root <R> --set S3 --why "..."` |
 | 收尾 | `index` + `lint --root <R>` |
@@ -197,7 +197,7 @@ python $S evolve-apply --id EV-0009 --bump minor --summary "改了什么、为�
 python $S doctor
 ```
 
-闭环：**发现 → 记录 → 分级 → 修 → 回归自测（26 项门禁）→ 升版本 + CHANGELOG → upgrade 迁移已有项目**。
+闭环：**发现 → 记录 → 分级 → 修 → 回归自测（发布门禁）→ 升版本 + CHANGELOG → upgrade 迁移已有项目**。
 已有项目升级：`python $S upgrade --root <R>`（只动 tracker/契约/锚点，**不改写任何日记与档案**）。
 
 ## 9. FAQ
