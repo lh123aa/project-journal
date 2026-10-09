@@ -32,6 +32,32 @@ python ~/.agents/skills/project-journal/scripts/install-global.py
 
 把仓库放进项目里（例如 `<项目>/tools/project-journal`），在项目 `AGENTS.md` 里写一行"跟踪项目时读 tools/project-journal/SKILL.md"即可。
 
+### 真源放在哪里（以及移动真源时怎么做）
+
+技能真源（这个 git 仓库）**可以放在任意位置**，只要各工具的发现路径指向它即可。当前一种典型布局：
+
+`@
+真源      E:\程序\github\我的项目\project-journal        ← git 仓库，随时 git pull
+发现路径  %USERPROFILE%\.agents\skills\project-journal  ← junction 指回真源（ASCII 短路径，DSH 等按此发现）
+工具链接  %USERPROFILE%\.claude\skills\project-journal  ← junction 指回真源
+`@
+
+为什么保留 `~/.agents/skills/project-journal` 这个 junction：DSH 等宿主按该路径发现技能，
+而且已经写进各项目 `AGENTS.md` 锚点里的绝对命令也依赖它。保留它，**就不需要改动任何已有项目**。
+
+移动真源后按三步走：
+
+`@bash
+# 1) 在原位置建 junction 指回新位置
+cmd /c mklink /J "%USERPROFILE%\.agents\skills\project-journal" "E:\程序\github\我的项目\project-journal"
+# 2) 到新位置重跑注册（重建各工具链接与托管块）
+python "E:\程序\github\我的项目\project-journal\scripts\install-global.py"
+# 3) 已有项目无需改动；如契约版本落后再跑一次
+python "E:\程序\github\我的项目\project-journal\scripts\journal.py" upgrade --root "<项目根>\project-journal"
+`@
+
+> 移动只影响"工具从哪里找到技能"，**不影响任何项目的记录数据**。`journal.py upgrade` 只动 tracker/契约/锚点，不改写日记与档案。
+
 ### 依赖
 
 **Python 3.8+，零第三方依赖**。任何能执行 shell 的 Agent 工具都能跑。
