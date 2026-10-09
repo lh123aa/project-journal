@@ -1,10 +1,10 @@
 # 自我迭代台账 . project-journal
 
-> 由 journal.py 自动生成（2026-10-09T11:15:34），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
+> 由 journal.py 自动生成（2026-10-09T11:29:04），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
 > 用途：记录本 skill 自身在运行中暴露的 bug / 逻辑问题 / 易用性问题及修订历史。
 > 闭环流程与治理规则见 references/08-self-evolution.md。
 
-- 当前版本：v1.1.3 . 条目 8 条 (applied 8)
+- 当前版本：v1.2.0 . 条目 9 条 (applied 9)
 
 | ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |
 |---|---|---|---|---|---|---|
@@ -16,6 +16,7 @@
 | EV-0006 | 2026-10-09 | logic | medium | applied | upgrade 无法刷新无 hash 记录的旧项目，PROTOCOL 落后提示永久存在 | 1.1.1 |
 | EV-0007 | 2026-10-09 | logic | medium | applied | 记录目录应固定在项目根的子文件夹；且向上找 .git 会把锚点注入到上级仓库 | 1.1.2 |
 | EV-0008 | 2026-10-09 | bug | medium | applied | 误报：合规的日记文件名被判为不合规 | 1.1.3 |
+| EV-0009 | 2026-10-09 | feature | high | applied | 缺少跨工具全局注册：所有 Agent 工具都能发现并调用本 skill | 1.2.0 |
 
 ## EV-0001 案例研究缺少「关键认知与讨论」车道，insight 正文进不了资产包
 
@@ -208,3 +209,37 @@ upgrade 改为先备份再刷新工具生成的 PROTOCOL.md（新增 --keep-prot
 修正 lint 中丢失反斜杠的日记文件名正则（把合规文件误报为结构性问题），并规范一处未转义的点号；selftest 新增断言：干净项目的 lint 输出不得包含 [EVOLVE]（含误报即失败）
 
 - 修复版本：v1.1.3（2026-10-09）
+
+## EV-0009 缺少跨工具全局注册：所有 Agent 工具都能发现并调用本 skill
+
+- 日期：2026-10-09 . 类别：feature . 严重度：high . 状态：applied . 发现于：v1.1.3
+- 相关项目：-
+- 复现命令：安装后在其他 Agent 工具中提问：如何跟踪这个项目
+- 证据：已检测本机安装：.claude/.codex/.gemini/.config/opencode/.cursor/.codeium-windsurf 均存在，但 skill 只存在于 .agents/skills
+
+**症状 / 期望**
+
+```
+**需求**：把 skill 注册为**全局技能**，让所有 Agent 工具（Claude Code / Codex CLI / Gemini CLI / opencode / Cursor / Windsurf / DSH 等）都能发现并调用它，而不是只在装了它的某一个工具里可用。
+
+**现状缺口**：安装只落在 @@~/.agents/skills/project-journal@@ 一处。
+- 有技能加载器的工具（Claude Code）需要各自的技能目录
+- 没有技能加载器的工具（Codex / Gemini / Windsurf）只能靠全局指令文件发现
+- 用户每换一个工具就要手工配置一遍，而且不知道配没配对
+
+**要做**：
+1. 新增 @@scripts/install-global.py@@：以 @@~/.agents/skills/project-journal@@ 为唯一真源，
+   向各工具目录建立链接（Windows 优先 junction，免管理员权限；失败则复制），
+   并向各工具的全局指令文件注入**托管块**（幂等，可重复执行）
+2. 支持 @@--home@@ 以便在临时目录里自测（不碰真实用户目录）
+3. 支持 @@--check@@ 只体检不落盘
+4. 输出"哪个工具怎么被发现"的对照表
+
+**边界**：DSH 已原生发现 @@~/.agents/skills@@，不额外注册，避免目录里出现重复条目。
+```
+
+**修复**
+
+新增 scripts/install-global.py：以 ~/.agents/skills/project-journal 为唯一真源，一键把 skill 注册为全局技能——Claude Code/opencode/Cursor 建 junction 链接（PowerShell 优先，cmd mklink 兜底且校验结果），Codex/Gemini/Windsurf 注入幂等托管块，DSH 原生发现不重复注册；链接指向 git 仓库，git pull 即可全工具升级。修复 cmd.exe 参数解析偶发失败导致静默退化为复制的问题（现明确告警）。新增 USAGE.md 完整手册与第 27 项回归用例
+
+- 修复版本：v1.2.0（2026-10-09）

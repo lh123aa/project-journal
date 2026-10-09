@@ -33,6 +33,16 @@ def run(args, cwd=None, env=None):
     return p.returncode, p.stdout.decode("utf-8", "replace")
 
 
+def run_script(args, cwd=None, env=None):
+    """运行 skill 目录下的任意脚本（用于 install-global 等）"""
+    e = dict(os.environ)
+    if env:
+        e.update(env)
+    p = subprocess.run([PY] + args, cwd=cwd, env=e,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return p.returncode, p.stdout.decode("utf-8", "replace")
+
+
 def check(name, cond, detail=""):
     ok = bool(cond)
     RESULTS.append((name, ok))
@@ -193,6 +203,17 @@ def main():
               rc == 0 and "契约版本：v" in r(pp) and "v0.0.1" not in r(pp)
               and "[EVOLVE]" not in out2 and os.path.isfile(pp + ".bak-v0.0.1"),
               out[-200:] + " || " + out2[-300:])
+
+        fh = os.path.join(tmp, "fakehome")
+        os.makedirs(os.path.join(fh, ".claude"), exist_ok=True)
+        os.makedirs(os.path.join(fh, ".codex"), exist_ok=True)
+        ins = os.path.join(SKILL_DIR, "scripts", "install-global.py")
+        rc, out = run_script([ins, "--home", fh])
+        rc2, out2 = run_script([ins, "--home", fh])
+        blk = r(os.path.join(fh, ".codex", "AGENTS.md")).count("project-journal:global:begin")
+        linked = os.path.isfile(os.path.join(fh, ".claude", "skills", "project-journal", "SKILL.md"))
+        check("install-global 注册到各工具且幂等（EV-0009）",
+              rc == 0 and rc2 == 0 and blk == 1 and linked, out[-200:] + " || " + out2[-200:])
 
         broken = os.path.join(tmp, "broken", "project-journal")
         run(["init", "--root", broken, "--project", "Broken"])

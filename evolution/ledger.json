@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "skill": "project-journal",
-  "version": "1.1.3",
+  "version": "1.2.0",
   "entries": [
     {
       "id": "EV-0001",
@@ -137,6 +137,23 @@
       "skill_version": "1.1.2",
       "fingerprint": "a3474e841328",
       "version": "1.1.3",
+      "resolution_date": "2026-10-09"
+    },
+    {
+      "id": "EV-0009",
+      "date": "2026-10-09",
+      "category": "feature",
+      "severity": "high",
+      "status": "applied",
+      "title": "缺少跨工具全局注册：所有 Agent 工具都能发现并调用本 skill",
+      "symptom": "**需求**：把 skill 注册为**全局技能**，让所有 Agent 工具（Claude Code / Codex CLI / Gemini CLI / opencode / Cursor / Windsurf / DSH 等）都能发现并调用它，而不是只在装了它的某一个工具里可用。\n\n**现状缺口**：安装只落在 @@~/.agents/skills/project-journal@@ 一处。\n- 有技能加载器的工具（Claude Code）需要各自的技能目录\n- 没有技能加载器的工具（Codex / Gemini / Windsurf）只能靠全局指令文件发现\n- 用户每换一个工具就要手工配置一遍，而且不知道配没配对\n\n**要做**：\n1. 新增 @@scripts/install-global.py@@：以 @@~/.agents/skills/project-journal@@ 为唯一真源，\n   向各工具目录建立链接（Windows 优先 junction，免管理员权限；失败则复制），\n   并向各工具的全局指令文件注入**托管块**（幂等，可重复执行）\n2. 支持 @@--home@@ 以便在临时目录里自测（不碰真实用户目录）\n3. 支持 @@--check@@ 只体检不落盘\n4. 输出\"哪个工具怎么被发现\"的对照表\n\n**边界**：DSH 已原生发现 @@~/.agents/skills@@，不额外注册，避免目录里出现重复条目。",
+      "evidence": "已检测本机安装：.claude/.codex/.gemini/.config/opencode/.cursor/.codeium-windsurf 均存在，但 skill 只存在于 .agents/skills",
+      "repro": "安装后在其他 Agent 工具中提问：如何跟踪这个项目",
+      "project": "",
+      "fix": "新增 scripts/install-global.py：以 ~/.agents/skills/project-journal 为唯一真源，一键把 skill 注册为全局技能——Claude Code/opencode/Cursor 建 junction 链接（PowerShell 优先，cmd mklink 兜底且校验结果），Codex/Gemini/Windsurf 注入幂等托管块，DSH 原生发现不重复注册；链接指向 git 仓库，git pull 即可全工具升级。修复 cmd.exe 参数解析偶发失败导致静默退化为复制的问题（现明确告警）。新增 USAGE.md 完整手册与第 27 项回归用例",
+      "skill_version": "1.1.3",
+      "fingerprint": "e1071d950e54",
+      "version": "1.2.0",
       "resolution_date": "2026-10-09"
     }
   ]

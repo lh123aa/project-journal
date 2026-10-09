@@ -55,14 +55,21 @@ DETECT 发现 -> LOG 记录(evolve) -> TRIAGE 分级 -> FIX 修改
 
 ## 安装
 
-把仓库放进 skills 目录即可（DSH / Claude Code 等 agentskills 兼容宿主）：
+全局注册到所有 Agent 工具（幂等，可重复执行）：
 
 ```bash
 git clone https://github.com/lh123aa/project-journal.git ~/.agents/skills/project-journal
 # Windows: %USERPROFILE%\.agents\skills\project-journal
+python ~/.agents/skills/project-journal/scripts/install-global.py   # 一键注册到各工具
 ```
 
+链接指向 git 仓库本身，所以 `git pull` 一次即可让所有工具同步升级；先体检不落盘用 `--check`。
+
+注册覆盖：Claude Code / opencode / Cursor（junction 链接，免管理员）、Codex CLI / Gemini CLI / Windsurf（全局指令托管块）；DSH 原生发现 `~/.agents/skills/*/SKILL.md`，无需额外注册。
+
 依赖：**Python 3.8+，仅标准库**，无需 pip 安装任何东西。
+
+📖 完整操作手册见 [USAGE.md](USAGE.md)。
 
 ## 快速开始
 

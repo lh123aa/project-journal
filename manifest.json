@@ -1,6 +1,6 @@
 {
   "name": "project-journal",
-  "version": "1.1.3",
+  "version": "1.2.0",
   "category": "Project Tracking / Knowledge Assetization",
   "description": "Continuous project process tracking and experience-asset engine. One call bootstraps an independent Markdown record folder plus a session anchor in AGENTS.md; afterwards every session auto-resumes and captures decisions, problems, solutions, daily execution, metrics and revenue until monetization succeeds or fails, then publishes a redacted sellable case-study asset pack.",
   "compat": [
