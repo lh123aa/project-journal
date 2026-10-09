@@ -216,6 +216,12 @@ def main():
               rc == 0 and rc2 == 0 and blk == 1 and linked, out[-200:] + " || " + out2[-200:])
         codex_md = r(os.path.join(fh, ".codex", "AGENTS.md"))
         skill_md = r(os.path.join(SKILL_DIR, "SKILL.md"))
+        lic_txt = r(os.path.join(SKILL_DIR, "LICENSE"))
+        mf = json.loads(r(os.path.join(SKILL_DIR, "manifest.json")))
+        check("授权为非商用，且 LICENSE 与 manifest 一致（EV-0012）",
+              "NonCommercial" in lic_txt and "MIT License" not in lic_txt
+              and str(mf.get("license", "")).startswith("CC-BY-NC"),
+              "license=%s len=%d" % (mf.get("license"), len(lic_txt)))
         check("全局托管块无未转换占位符 @@（EV-0011）",
               "@@" not in codex_md, [l for l in codex_md.splitlines() if "@@" in l][:2])
         check("最短口令表同时进入全局块与 SKILL.md（EV-0010）",

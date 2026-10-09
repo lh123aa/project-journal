@@ -5,6 +5,11 @@
 
 <!-- CHANGELOG:INSERT -->
 
+## [1.3.0] - 2026-10-09
+- 授权从 MIT 改为 CC BY-NC 4.0（禁止商用）：LICENSE 换为官方 legalcode 全文，README 顶部与授权段写明允许/禁止清单与商用需另行授权并声明历史版本（<=v1.2.2）仍为 MIT、授权不可撤回；manifest 增加 license 字段；新增回归用例（第 30 项）断言授权为非商用且 LICENSE 与 manifest 一致（EV-0012）
+- 类别 / 严重度：docs / high
+- 台账：evolution/LEDGER.md 的 EV-0012
+
 ## [1.2.2] - 2026-10-09
 - 修复全局托管块泄漏 @@ 占位符：install-global.py 的占位符转换函数此前被写坏成恒等操作，导致运行期 @@ 转反引号失效；删除该恒等转换、表格行改用真实反引号，并新增回归断言（注入结果不得出现 @@，第 29 项）（EV-0011）
 - 类别 / 严重度：bug / medium
