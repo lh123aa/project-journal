@@ -4,8 +4,8 @@
 >
 > ### Projects can fail. They shouldn't die in vain.
 
-<!-- 🎬 Demo GIF: record per the demo script, export demo.gif into assets/ and uncomment the line below -->
-<!-- ![30-second demo: from install to your first asset pack](assets/demo.gif) -->
+<!-- Demo GIF generated from assets/demo.mp4 (script: tools/make-demo-video.py) -->
+![Demo: a real terminal replay of `init` (full 2-min version: see Releases)](assets/demo.gif)
 
 **The 30-second version**
 
@@ -89,6 +89,7 @@ This README covers ~20% of it. The **"Project Journal · Methodology Pack"** inc
 - 📖 **Methodology handbook**: why record / what to record / how to judge (success & stop-loss lines) / how to turn process into sellable assets
 - 🧰 **12 ready-to-use templates**: charter, weekly review, closeout verdict, case-study framework, redaction checklist…
 - 📚 **Real case library**: starts with one fully-verifiable case study; a new case every quarter
+- ▶️ **2-minute demo video**: [demo.mp4](https://github.com/lh123aa/project-journal/releases/download/v1.5.0/demo.mp4) (real command replay, silent with captions)
 - 🎬 **30-minute video walkthrough** (in production — free with v0.2)
 - 🔄 **One year of updates**
 
