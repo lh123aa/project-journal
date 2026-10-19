@@ -88,8 +88,8 @@ This README covers ~20% of it. The **"Project Journal · Methodology Pack"** inc
 
 - 📖 **Methodology handbook**: why record / what to record / how to judge (success & stop-loss lines) / how to turn process into sellable assets
 - 🧰 **12 ready-to-use templates**: charter, weekly review, closeout verdict, case-study framework, redaction checklist…
-- 📚 **Real case library**: full tracking → verdict → monetization records of real projects (updated quarterly)
-- 🎬 **30-minute video**: from install to your first asset pack
+- 📚 **Real case library**: starts with one fully-verifiable case study; a new case every quarter
+- 🎬 **30-minute video walkthrough** (in production — free with v0.2)
 - 🔄 **One year of updates**
 
 **$19 early bird (first 100 copies; $29 regular)** · 7-day no-questions refund
