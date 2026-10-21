@@ -152,6 +152,11 @@ def link_dir(src, dst, use_copy, apply_changes):
 
 
 def main(argv=None):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     p = argparse.ArgumentParser(prog="install-global.py",
                                 description="把 project-journal 注册为全局技能（所有 Agent 工具可用）")
     p.add_argument("--home", help="用户家目录（默认 ~，自测时可用临时目录）")

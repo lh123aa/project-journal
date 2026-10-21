@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import importlib.util
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL_DIR = os.path.dirname(HERE)
@@ -43,6 +44,17 @@ def run_script(args, cwd=None, env=None):
     return p.returncode, p.stdout.decode("utf-8", "replace")
 
 
+def run_split(args, cwd=None, env=None):
+    """运行脚本并分离 stdout/stderr（用于 --json 输出）"""
+    e = dict(os.environ)
+    if env:
+        e.update(env)
+    p = subprocess.run([PY] + args, cwd=cwd, env=e,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return (p.returncode, p.stdout.decode("utf-8", "replace"),
+            p.stderr.decode("utf-8", "replace"))
+
+
 def check(name, cond, detail=""):
     ok = bool(cond)
     RESULTS.append((name, ok))
@@ -66,6 +78,11 @@ def r(path):
 
 
 def main():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     keep = "--keep" in sys.argv
     tmp = tempfile.mkdtemp(prefix="pj-selftest-")
     try:
@@ -284,6 +301,130 @@ def main():
         rc, out = run(["upgrade", "--all", farm])
         check("upgrade --all 批量迁移（EV-0020）",
               rc == 0 and out.count("[OK  ]") == 2, out[-300:])
+
+        # ---- Obsidian 生成层（不依赖 Obsidian 安装）----
+        viz = os.path.join(tmp, "viz", "project-journal")
+        run(["init", "--root", viz, "--project", "Viz",
+             "--success", "10 单", "--stop-loss", "0 单"])
+        run(["add", "--root", viz, "--type", "decision", "--title", "选择 A 方案",
+             "--status", "accepted", "--body-file", os.path.join(bodies, "d.md")])
+        run(["add", "--root", viz, "--type", "problem", "--title", "卡在测试",
+             "--status", "open", "--body-file", os.path.join(bodies, "p.md")])
+        run(["add", "--root", viz, "--type", "milestone", "--title", "首个版本上线",
+             "--body-file", os.path.join(bodies, "d.md")])
+        run(["metric", "--root", viz, "--name", "MRR", "--value", "120",
+             "--unit", "USD", "--source", "test"])
+        run(["ledger", "--root", viz, "--kind", "income", "--amount", "120",
+             "--currency", "USD", "--channel", "test"])
+        rc, out = run(["obsidian", "--root", viz])
+        vfiles = ["HOME.md", "_views/decisions.md", "_views/problems.md",
+                  "_views/milestones.md", "_views/metrics.md", "_views/reviews.md",
+                  ".obsidian/app.json", ".obsidian/daily-notes.json", ".gitignore"]
+        missingv = [f for f in vfiles if not os.path.isfile(os.path.join(viz, f))]
+        check("obsidian 生成驾驶舱 + 五个视图", rc == 0 and not missingv,
+              missingv or out[-300:])
+        home = r(os.path.join(viz, "HOME.md"))
+        check("HOME 链接到五个视图与档案",
+              all(x in home for x in ("_views/decisions.md", "_views/problems.md",
+                                      "_views/milestones.md", "_views/metrics.md",
+                                      "_views/reviews.md", "ADR-0001", "PB-0001")),
+              home[-400:])
+
+        def dead_links(base):
+            bad = []
+            paths = [os.path.join(base, "HOME.md")] + [
+                os.path.join(base, "_views", f)
+                for f in os.listdir(os.path.join(base, "_views")) if f.endswith(".md")]
+            for p in paths:
+                txt = r(p)
+                for target in re.findall(r"\]\(([^)]+)\)", txt):
+                    if target.startswith(("http://", "https://", "#", "mailto:")):
+                        continue
+                    target = target.split("#", 1)[0].replace("%20", " ")
+                    if not target:
+                        continue
+                    tp = os.path.normpath(os.path.join(os.path.dirname(p), target))
+                    if not os.path.exists(tp):
+                        bad.append(os.path.basename(p) + " -> " + target)
+            return bad
+
+        badlinks = dead_links(viz)
+        check("obsidian 视图无死链", not badlinks, badlinks[:5])
+        rc, out = run(["obsidian", "--root", viz, "--check"])
+        check("obsidian --check 最新返回 0", rc == 0, out[-300:])
+        before = {f: r(os.path.join(viz, f)) for f in ("HOME.md", "_views/decisions.md")}
+        run(["obsidian", "--root", viz])
+        after = {f: r(os.path.join(viz, f)) for f in before}
+        check("obsidian 生成幂等（无时间戳漂移）", before == after, "内容变化")
+        run(["metric", "--root", viz, "--name", "MRR", "--value", "150", "--unit", "USD"])
+        rc, out = run(["obsidian", "--root", viz, "--check"])
+        check("obsidian --check 能发现过期（返回 1）", rc == 1 and "STALE" in out, out[-300:])
+        run(["obsidian", "--root", viz])
+
+        # ---- 安装器计划（不下载）----
+        io = os.path.join(HERE, "install-obsidian.py")
+        rc, out, err = run_split(
+            [io, "--dry-run", "--version", "1.14.4", "--json"],
+            env={"PJ_OBSIDIAN_STATE": os.path.join(tmp, "obs-state.json")})
+        try:
+            plan = json.loads(out)
+        except Exception:
+            plan = {}
+        check("install-obsidian dry-run 计划可用",
+              rc == 0 and plan.get("release", {}).get("version") == "1.14.4"
+              and "Obsidian-1.14.4.exe" in plan.get("release", {}).get("url", ""),
+              out[-300:] + " || " + err[-200:])
+        spec = importlib.util.spec_from_file_location("pj_install_obsidian", io)
+        iom = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(iom)
+        check("install-obsidian 接受官方 Dynalist 签名",
+              iom.trusted_signer("CN=Dynalist Inc, O=Dynalist Inc, C=CA")
+              and iom.trusted_signer("CN=Obsidian.md")
+              and not iom.trusted_signer("CN=Evil Corp"),
+              "trusted_signer")
+
+        # ---- 一键安装（跳过 Obsidian，避免自测下载）----
+        setup = os.path.join(HERE, "setup.py")
+        shome = os.path.join(tmp, "setup-home")
+        svault = os.path.join(tmp, "setup-vault")
+        rc, out = run_script([setup, "--home", shome, "--no-obsidian", "--vault", svault])
+        check("setup 一键安装（技能 + vault + 配置）",
+              rc == 0 and os.path.isfile(os.path.join(svault, "HOME.md"))
+              and os.path.isfile(os.path.join(shome, ".project-journal", "config.json")),
+              out[-400:])
+        rc, out = run_script([setup, "--home", shome, "--no-obsidian",
+                              "--vault", svault, "--check"])
+        check("setup --check 通过", rc == 0, out[-400:])
+        rc, out, err = run_split([setup, "--home", shome, "--no-obsidian",
+                                  "--vault", svault, "--check", "--json"])
+        try:
+            sj = json.loads(out)
+        except Exception:
+            sj = {}
+        check("setup --check --json 纯 JSON", rc == 0 and sj.get("ok") is True,
+              out[-300:] + " || " + err[-200:])
+        rec = os.path.join(tmp, "record-project", "project-journal")
+        run(["init", "--root", rec, "--project", "Rec", "--success", "s", "--stop-loss", "x"])
+        shome2 = os.path.join(tmp, "setup-home2")
+        rc, out = run_script([setup, "--home", shome2, "--no-obsidian", "--project", rec])
+        try:
+            rcfg = json.loads(r(os.path.join(shome2, ".project-journal", "config.json")))
+        except Exception:
+            rcfg = {}
+        check("setup --project 支持直接传入记录目录",
+              rc == 0 and rcfg.get("vault", {}).get("mode") == "record"
+              and rcfg.get("vault", {}).get("record_dir") == rec,
+              out[-400:] + " || " + json.dumps(rcfg, ensure_ascii=False)[:200])
+        check("manifest 声明 Obsidian 可选依赖",
+              ((mf.get("requires") or {}).get("optional") or {}).get(
+                  "obsidian", {}).get("min_version") == "1.8.0",
+              mf.get("requires"))
+        jspec = importlib.util.spec_from_file_location("pj_journal_selftest", CLI)
+        jm = importlib.util.module_from_spec(jspec)
+        jspec.loader.exec_module(jm)
+        check("LEDGER.md 使用发布版本号（EV-0024）",
+              "v9.9.9" in jm.ledger_md({"version": "9.9.9", "entries": []}),
+              "ledger_md 未使用 led.version")
 
         broken = os.path.join(tmp, "broken", "project-journal")
         run(["init", "--root", broken, "--project", "Broken"])

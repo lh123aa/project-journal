@@ -248,7 +248,7 @@ def ledger_md(led):
     st = {}
     for e in ents:
         st[e.get("status", "open")] = st.get(e.get("status", "open"), 0) + 1
-    L.append("- 当前版本：v%s . 条目 %d 条 %s" % (skill_version(), len(ents),
+    L.append("- 当前版本：v%s . 条目 %d 条 %s" % (led.get("version") or skill_version(), len(ents),
              ("(" + " . ".join("%s %d" % (k, v) for k, v in st.items()) + ")") if st else ""))
     L.append("")
     L.append("| ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |")
@@ -1613,6 +1613,633 @@ def cmd_publish(args):
     return 0
 
 
+# ---- Obsidian 可视化 vault（生成层；不改动日记与档案）----
+
+CODE_CN = {"T": "任务", "D": "决策", "P": "问题", "S": "解法", "I": "认知",
+           "X": "实验", "M": "指标", "$": "收入", "C": "成本", "R": "风险",
+           "L": "教训", "MS": "里程碑", "Q": "开放问题", "U": "更新"}
+
+OBSIDIAN_VIEWS = [
+    ("decisions.md", "决策库", "当时为什么这么选"),
+    ("problems.md", "问题与解法", "卡在哪、怎么绕过去"),
+    ("milestones.md", "里程碑", "项目走到哪了"),
+    ("metrics.md", "数据", "真实数字与收支"),
+    ("reviews.md", "复盘与资产", "复盘、文档、可售资产包"),
+]
+
+OBSIDIAN_APP = {
+    "useMarkdownLinks": True,
+    "newLinkFormat": "relative",
+    "alwaysUpdateLinks": True,
+    "attachmentFolderPath": "assets",
+    "showUnsupportedFiles": False,
+}
+
+OBSIDIAN_DAILY = {
+    "folder": "journal",
+    "format": "YYYY-MM-DD",
+    "template": "",
+    "autorun": False,
+}
+
+OBSIDIAN_CORE = {
+    "file-explorer": True, "global-search": True, "switcher": True,
+    "graph": True, "backlink": True, "outgoing-link": True, "tag-pane": True,
+    "page-preview": True, "daily-notes": True, "templates": False,
+    "note-composer": True, "command-palette": True, "editor-status": True,
+    "bookmarks": True, "outline": True, "word-count": True,
+    "file-recovery": True, "canvas": True, "properties": True, "bases": True,
+}
+
+OBSIDIAN_CORE_ARRAY = [k for k, v in OBSIDIAN_CORE.items() if v and k != "bases"]
+
+OBSIDIAN_GITIGNORE = (
+    "# Obsidian（由 journal.py obsidian 生成）\n"
+    ".obsidian/workspace.json\n"
+    ".obsidian/workspace-mobile.json\n"
+    ".obsidian/cache/\n"
+    ".trash/\n"
+)
+
+
+def _yaml_q(s):
+    return '"' + str(s or "").replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _cell(s):
+    s = str(s if s is not None else "").replace("\r", " ").replace("\n", " ")
+    return s.replace("|", "\\|")
+
+
+def _link_text(s):
+    return str(s if s is not None else "").replace("[", "\\[").replace("]", "\\]")
+
+
+def _md_link(from_dir, target, text):
+    rp = os.path.relpath(target, from_dir).replace(os.sep, "/").replace(" ", "%20")
+    return "[%s](%s)" % (_link_text(text), rp)
+
+
+def _tags(s):
+    if isinstance(s, (list, tuple)):
+        return [str(x).strip() for x in s if str(x).strip()]
+    s = (s or "").strip()
+    if s.startswith("[") and s.endswith("]"):
+        s = s[1:-1]
+    return [x.strip().strip("'\"") for x in re.split(r"[,;]", s) if x.strip()]
+
+
+def _status(s, typ=""):
+    v = (s or "").strip()
+    low = v.lower()
+    if not low:
+        low = "open" if typ in ("problem", "risk") else ("accepted" if typ == "decision" else "-")
+        v = low
+    if low in ("solved", "closed", "done", "mitigated", "accepted", "success"):
+        return "🟢 " + v
+    if low in ("open", "proposed", "active", "in-progress", "pending"):
+        return "🟠 " + v
+    if low in ("wontfix", "rejected", "paused", "failure"):
+        return "⚪ " + v
+    return v
+
+
+def _links_of(rec):
+    s = rec.get("links") or ""
+    if isinstance(s, (list, tuple)):
+        return [str(x).strip() for x in s if str(x).strip()]
+    s = s.strip()
+    if s.startswith("[") and s.endswith("]"):
+        s = s[1:-1]
+    return [x.strip().strip("'\"") for x in re.split(r"[,;]", s) if x.strip()]
+
+
+def _ids_in(text):
+    return re.findall(r"\b((?:ADR|PB|SL|EX|IN|LS|RK|MS)-\d{4})\b", text or "")
+
+
+def _rec_link(root, from_dir, rec, text=None):
+    p = os.path.join(root, rec["path"].replace("/", os.sep))
+    return _md_link(from_dir, p, text or rec["id"])
+
+
+def _day_link(root, from_dir, date):
+    return _md_link(from_dir, day_path(root, date), date)
+
+
+def _mermaid_label(s):
+    s = str(s or "").replace("\n", " ").replace(":", "：").replace(";", "，")
+    s = s.replace("#", "＃").replace("`", "'")
+    return s[:60]
+
+
+def _obsidian_fm(title, tags):
+    L = ["---", "title: %s" % _yaml_q(title), "generated: true", "tags:"]
+    for t in tags:
+        L.append("  - " + t)
+    L += ["---", ""]
+    return L
+
+
+def _render_home(root, t, f):
+    recs = f["records"]
+    by_type = {}
+    for r in recs:
+        by_type.setdefault(r["type"], []).append(r)
+    created = t.get("created", "")
+    last = t.get("last_entry", "") or (f["days"][-1] if f["days"] else "")
+    today = today_str()
+    stage = t.get("stage", "S0")
+    gap = days_between(last, today) if last else None
+    L = _obsidian_fm("项目驾驶舱", ["project-journal", "dashboard"])
+    L += ["# 项目驾驶舱 · %s" % (t.get("project") or os.path.basename(root)), ""]
+    L += ["> 由 `journal.py obsidian` 自动生成，**请勿手工编辑**。源数据：`journal/`、`records/`、`metrics/`。", ""]
+    L += ["## 现在", "", "| 项目 | 值 |", "|---|---|"]
+    L += ["| 阶段 | **%s %s** |" % (stage, STAGE_NAME.get(stage, ""))]
+    hist = t.get("stage_history", [])
+    trail = " -> ".join("%s(%s)" % (h.get("to", "?"), h.get("date", "?")) for h in hist)
+    L += ["| 阶段轨迹 | %s |" % (trail or "%s(%s)" % (stage, created or "?"))]
+    L += ["| 起始 | %s（第 %d 天） |" % (created or "未填写", (days_between(created, today) + 1) if created else 0)]
+    if last:
+        gap_txt = "今天" if gap == 0 else "%d 天前" % gap
+        mark = " **<- 已停滞**" if gap >= 7 and not t.get("outcome") else ""
+        L += ["| 最后记录 | %s（%s）%s |" % (last, gap_txt, mark)]
+    else:
+        L += ["| 最后记录 | 尚无 |"]
+    L += ["| 终局 | %s |" % (t.get("outcome") or "进行中")]
+    L += ["| 条目总量 | 日记 %d 条 · 档案 %d 份 · 指标 %d 行 · 收支 %d 行 |"
+          % (f["entry_count"], len(recs), len(f["metrics"]), len(f["ledger"]))]
+    L += ["", "## 成败标尺", ""]
+    L += ["> **成功线**：%s" % ((t.get("success_line") or "未填写").replace("\n", " ")),
+          ">",
+          "> **止损线**：%s" % ((t.get("stop_loss") or "未填写").replace("\n", " ")), ""]
+    L += ["## 五个入口", "", "| 视图 | 看什么 | 数量 |", "|---|---|---|"]
+    rdir = os.path.join(root, "reviews")
+    pdir = os.path.join(root, "publish")
+    rev_n = len([x for x in os.listdir(rdir) if x.endswith(".md")]) if os.path.isdir(rdir) else 0
+    pub_n = len([x for x in os.listdir(pdir) if os.path.isdir(os.path.join(pdir, x))]) \
+        if os.path.isdir(pdir) else 0
+    counts = {"decisions.md": len(by_type.get("decision", [])),
+              "problems.md": len(by_type.get("problem", [])),
+              "milestones.md": len(by_type.get("milestone", [])),
+              "metrics.md": len(f["metrics"]),
+              "reviews.md": rev_n + pub_n}
+    for fn, name, desc in OBSIDIAN_VIEWS:
+        L.append("| %s | %s | %d |" % (
+            _md_link(root, os.path.join(root, "_views", fn), name), desc, counts.get(fn, 0)))
+    L += ["", "## 未闭环问题", ""]
+    opens = [r for r in by_type.get("problem", [])
+             if (r["status"] or "open") not in ("solved", "closed", "done", "wontfix")]
+    if opens:
+        L += ["| ID | 问题 | 状态 | 日期 |", "|---|---|---|---|"]
+        for r in opens[:8]:
+            L.append("| %s | %s | %s | %s |" % (
+                _rec_link(root, root, r), _cell(r["title"]), _status(r["status"], "problem"), r["date"]))
+    else:
+        L += ["_无。_"]
+    L += ["", "## 开放风险", ""]
+    risks = [r for r in by_type.get("risk", [])
+             if (r["status"] or "open") not in ("mitigated", "closed", "accepted", "done")]
+    if risks:
+        L += ["| ID | 风险 | 状态 |", "|---|---|---|"]
+        for r in risks[:8]:
+            L.append("| %s | %s | %s |" % (
+                _rec_link(root, root, r), _cell(r["title"]), _status(r["status"], "risk")))
+    else:
+        L += ["_无。_"]
+    L += ["", "## 下一步（前 5 条）", ""]
+    na = os.path.join(root, "NEXT-ACTIONS.md")
+    todos = []
+    if os.path.isfile(na):
+        todos = [re.sub(r"^\s*[-*]\s*\[ \]\s*", "", l.strip())
+                 for l in read_text(na).splitlines() if re.match(r"^\s*[-*]\s*\[ \]", l)]
+    L += (["- " + x for x in todos[:5]] or ["_没有未完成事项。_"])
+    L += ["", "## 最近条目", ""]
+    if f["recent"]:
+        L += ["| 日期 | 时间 | 类型 | 标题 | 档案 |", "|---|---|---|---|---|"]
+        for d, e in f["recent"][::-1][:10]:
+            rid = e.get("id") or ""
+            rid_cell = rid or "-"
+            if rid:
+                rr = next((x for x in recs if x["id"] == rid), None)
+                if rr:
+                    rid_cell = _rec_link(root, root, rr, rid)
+            L.append("| %s | %s | %s | %s | %s |" % (
+                _day_link(root, root, d), e["time"], CODE_CN.get(e["code"], e["code"]),
+                _cell(e["title"]), rid_cell))
+    else:
+        L += ["_尚无日记条目。_"]
+    L += ["", "## 数据（最新 5 条）", ""]
+    if f["latest"]:
+        L += ["| 指标 | 值 | 单位 | 日期 |", "|---|---|---|---|"]
+        latest_items = sorted(f["latest"].items(),
+                              key=lambda kv: kv[1].get("date", ""), reverse=True)[:5]
+        for name, row in latest_items:
+            L.append("| %s | %s | %s | %s |" % (
+                _cell(name), _cell(row.get("value", "")), _cell(row.get("unit", "")), row.get("date", "")))
+    else:
+        L += ["_尚无指标。用 `journal.py metric` 记录真实数字。_"]
+    if f["totals"]:
+        L += [""]
+        for cur, tot in sorted(f["totals"].items()):
+            L.append("- **%s**：收入 %.2f · 成本 %.2f · 净额 %.2f"
+                     % (cur, tot["income"], tot["cost"], tot["income"] - tot["cost"]))
+    L += ["", "> 详细状态：[STATE.md](STATE.md) · 全量索引：[INDEX.md](INDEX.md) · 宪章：[CHARTER.md](CHARTER.md) · 下一步：[NEXT-ACTIONS.md](NEXT-ACTIONS.md)", ""]
+    L += ["## 怎么用", "",
+          "1. 每次收工：先用 `journal.py add/metric/ledger` 落盘，再跑 `journal.py obsidian --root <本目录>` 刷新视图。",
+          "2. 左侧文件树是稳定 ID；标题看本页和五个视图的表格。",
+          "3. 不想用 Obsidian 也不影响：全部是普通 Markdown，GitHub / VS Code 可直接读。", ""]
+    return "\n".join(L).rstrip() + "\n"
+
+
+def _render_decisions(root, t, f):
+    vdir = os.path.join(root, "_views")
+    rs = sorted([r for r in f["records"] if r["type"] == "decision"],
+                key=lambda r: (r.get("date", ""), r.get("id", "")), reverse=True)
+    L = _obsidian_fm("决策库", ["project-journal", "decisions"])
+    L += ["# 决策库", ""]
+    L += ["> 只记“有判断、有取舍”的决定。每条都该能回答：当时为什么这么选、放弃了什么、代价是什么。", ""]
+    pending = [r for r in rs if (r["status"] or "").lower() in ("proposed", "pending", "draft")]
+    decided = [r for r in rs if r not in pending]
+    L += ["**共 %d 条** · 待拍板 %d · 已定 %d" % (len(rs), len(pending), len(decided)), ""]
+    if pending:
+        L += ["## 待拍板", "", "| ID | 日期 | 决策 | 状态 | 置信度 | 标签 |", "|---|---|---|---|---|---|"]
+        for r in pending:
+            L.append("| %s | %s | %s | %s | %s | %s |" % (
+                _rec_link(root, vdir, r), r["date"], _cell(r["title"]), _status(r["status"], "decision"),
+                r.get("confidence", "") or "-", _cell(" · ".join(_tags(r.get("tags"))))))
+        L += [""]
+    L += ["## 已定", ""]
+    if decided:
+        L += ["| ID | 日期 | 决策 | 状态 | 置信度 | 标签 |", "|---|---|---|---|---|---|"]
+        for r in decided:
+            L.append("| %s | %s | %s | %s | %s | %s |" % (
+                _rec_link(root, vdir, r), r["date"], _cell(r["title"]), _status(r["status"], "decision"),
+                r.get("confidence", "") or "-", _cell(" · ".join(_tags(r.get("tags"))))))
+    else:
+        L += ["> [!note] 尚无决策记录", "> 用 `journal.py add --type decision` 记录。", ""]
+    return "\n".join(L).rstrip() + "\n"
+
+
+def _related(rec, pool):
+    ids = set(_links_of(rec)) | set(_ids_in(rec.get("raw", "")))
+    out = []
+    for c in pool:
+        if c["id"] in ids or rec["id"] in (set(_links_of(c)) | set(_ids_in(c.get("raw", "")))):
+            out.append(c)
+    return out
+
+
+def _render_problems(root, t, f):
+    vdir = os.path.join(root, "_views")
+    problems = sorted([r for r in f["records"] if r["type"] == "problem"],
+                      key=lambda r: (r.get("date", ""), r.get("id", "")), reverse=True)
+    solutions = sorted([r for r in f["records"] if r["type"] == "solution"],
+                       key=lambda r: (r.get("date", ""), r.get("id", "")), reverse=True)
+    risks = sorted([r for r in f["records"] if r["type"] == "risk"],
+                   key=lambda r: (r.get("date", ""), r.get("id", "")), reverse=True)
+    opens = [r for r in problems if (r["status"] or "open") not in ("solved", "closed", "done", "wontfix")]
+    closed = [r for r in problems if r not in opens]
+    L = _obsidian_fm("问题与解法", ["project-journal", "problems"])
+    L += ["# 问题与解法", ""]
+    L += ["> 卡点写清症状与根因；解法写清适用场景与步骤。结项时这两张表就是教训清单。", ""]
+    L += ["## 未闭环问题（%d）" % len(opens), ""]
+    if opens:
+        L += ["| ID | 日期 | 问题 | 状态 | 关联解法 |", "|---|---|---|---|---|"]
+        for r in opens:
+            rel = _related(r, solutions)
+            rel_txt = " · ".join(_rec_link(root, vdir, x, x["id"]) for x in rel) or "—"
+            L.append("| %s | %s | %s | %s | %s |" % (
+                _rec_link(root, vdir, r), r["date"], _cell(r["title"]), _status(r["status"], "problem"), rel_txt))
+    else:
+        L += ["_无。_"]
+    L += ["", "## 已闭环问题（%d）" % len(closed), ""]
+    if closed:
+        L += ["| ID | 日期 | 问题 | 状态 | 关联解法 |", "|---|---|---|---|---|"]
+        for r in closed:
+            rel = _related(r, solutions)
+            rel_txt = " · ".join(_rec_link(root, vdir, x, x["id"]) for x in rel) or "—"
+            L.append("| %s | %s | %s | %s | %s |" % (
+                _rec_link(root, vdir, r), r["date"], _cell(r["title"]), _status(r["status"], "problem"), rel_txt))
+    else:
+        L += ["_无。_"]
+    L += ["", "## 解法库（%d）" % len(solutions), ""]
+    if solutions:
+        L += ["| ID | 日期 | 解法 | 状态 | 对应问题 |", "|---|---|---|---|---|"]
+        for r in solutions:
+            rel = _related(r, problems)
+            rel_txt = " · ".join(_rec_link(root, vdir, x, x["id"]) for x in rel) or "—"
+            L.append("| %s | %s | %s | %s | %s |" % (
+                _rec_link(root, vdir, r), r["date"], _cell(r["title"]), _status(r["status"]), rel_txt))
+    else:
+        L += ["> [!note] 尚无解法记录", "> 解决卡点后用 `journal.py add --type solution --link PB-xxxx` 记录。", ""]
+    L += ["", "## 开放风险（%d）" % len([r for r in risks if (r["status"] or "open") not in ("mitigated", "closed", "accepted", "done")]), ""]
+    risk_open = [r for r in risks if (r["status"] or "open") not in ("mitigated", "closed", "accepted", "done")]
+    if risk_open:
+        L += ["| ID | 日期 | 风险 | 状态 | 标签 |", "|---|---|---|---|---|"]
+        for r in risk_open:
+            L.append("| %s | %s | %s | %s | %s |" % (
+                _rec_link(root, vdir, r), r["date"], _cell(r["title"]), _status(r["status"], "risk"),
+                _cell(" · ".join(_tags(r.get("tags"))))))
+    else:
+        L += ["_无。_"]
+    return "\n".join(L).rstrip() + "\n"
+
+
+def _render_milestones(root, t, f):
+    vdir = os.path.join(root, "_views")
+    ms = sorted([r for r in f["records"] if r["type"] == "milestone"],
+                key=lambda r: (r.get("date", ""), r.get("id", "")))
+    L = _obsidian_fm("里程碑", ["project-journal", "milestones"])
+    L += ["# 里程碑", ""]
+    L += ["> 只记真正改变项目状态的事：上线、首单、签约、放弃、转向。", ""]
+    if ms:
+        L += ["```mermaid", "timeline", "    title 里程碑"]
+        for r in ms[-20:]:
+            L.append("    %s : %s %s" % (r.get("date") or "未知", r["id"], _mermaid_label(r["title"])))
+        L += ["```", ""]
+        L += ["| ID | 日期 | 里程碑 | 状态 | 标签 |", "|---|---|---|---|---|"]
+        for r in reversed(ms):
+            L.append("| %s | %s | %s | %s | %s |" % (
+                _rec_link(root, vdir, r), r["date"], _cell(r["title"]), _status(r["status"]),
+                _cell(" · ".join(_tags(r.get("tags"))))))
+    else:
+        L += ["> [!note] 尚无里程碑", "> 用 `journal.py add --type milestone` 记录。", ""]
+    hist = t.get("stage_history", [])
+    if hist:
+        L += ["", "## 阶段轨迹", "", "| 日期 | 从 | 到 | 原因 |", "|---|---|---|---|"]
+        for h in hist:
+            L.append("| %s | %s | %s | %s |" % (h.get("date", ""), h.get("from", "") or "-",
+                                               h.get("to", ""), _cell(h.get("why", ""))))
+    return "\n".join(L).rstrip() + "\n"
+
+
+def _render_metrics(root, t, f):
+    vdir = os.path.join(root, "_views")
+    L = _obsidian_fm("数据", ["project-journal", "metrics"])
+    L += ["# 数据", ""]
+    L += ["> 只收真实数字：收入、成本、转化、耗时。没有数据就写“无”，不编造。", ""]
+    L += ["## 关键数字（最新）", ""]
+    if f["latest"]:
+        L += ["| 指标 | 值 | 单位 | 日期 | 来源 | 置信度 |", "|---|---|---|---|---|---|"]
+        for name in sorted(f["latest"]):
+            row = f["latest"][name]
+            L.append("| %s | %s | %s | %s | %s | %s |" % (
+                _cell(name), _cell(row.get("value", "")), _cell(row.get("unit", "")), row.get("date", ""),
+                _cell(row.get("source", "")) or "-", _cell(row.get("confidence", "")) or "-"))
+    else:
+        L += ["> [!note] 尚无指标", "> 用 `journal.py metric --name MRR --value 120 --unit USD` 记录。", ""]
+    groups = {}
+    for row in f["metrics"]:
+        name = (row.get("metric") or "").strip()
+        if name:
+            groups.setdefault(name, []).append(row)
+    trends = [(name, sorted(rows, key=lambda x: x.get("date", ""))[-8:]) for name, rows in groups.items()]
+    trends = [(name, rows) for name, rows in trends if len(rows) >= 2]
+    if trends:
+        L += ["", "## 指标趋势", ""]
+        for name, rows in sorted(trends):
+            L += ["### %s" % _cell(name), "", "| 日期 | 值 | 单位 | 来源 |", "|---|---|---|---|"]
+            for row in rows:
+                L.append("| %s | %s | %s | %s |" % (
+                    row.get("date", ""), _cell(row.get("value", "")), _cell(row.get("unit", "")),
+                    _cell(row.get("source", "")) or "-"))
+            L += [""]
+    L += ["", "## 收支", ""]
+    if f["totals"]:
+        L += ["| 币种 | 收入 | 成本 | 净额 |", "|---|---|---|---|"]
+        for cur, tot in sorted(f["totals"].items()):
+            L.append("| %s | %.2f | %.2f | %.2f |" % (cur, tot["income"], tot["cost"], tot["income"] - tot["cost"]))
+    else:
+        L += ["_尚无收支记录。_"]
+    if f["ledger"]:
+        L += ["", "### 流水（最近 50 笔）", "", "| 日期 | 类型 | 金额 | 币种 | 渠道 | 备注 |", "|---|---|---|---|---|---|"]
+        for row in sorted(f["ledger"], key=lambda x: x.get("date", ""), reverse=True)[:50]:
+            kind = (row.get("kind") or "").lower()
+            kind_cn = "收入" if kind.startswith("inc") or kind in ("revenue", "收入") else "成本"
+            L.append("| %s | %s | %s | %s | %s | %s |" % (
+                row.get("date", ""), kind_cn, _cell(row.get("amount", "")), _cell(row.get("currency", "")),
+                _cell(row.get("channel", "")) or "-", _cell(row.get("note", "")) or "-"))
+    return "\n".join(L).rstrip() + "\n"
+
+
+def _render_reviews(root, t, f):
+    vdir = os.path.join(root, "_views")
+    L = _obsidian_fm("复盘与资产", ["project-journal", "reviews"])
+    L += ["# 复盘与资产", ""]
+    L += ["> 复盘不是流水账：写清原因、判断变化、下期只做一件最重要的事。", ""]
+    docs = [("CHARTER.md", "立项宪章（成功线 / 止损线）"), ("PROTOCOL.md", "记录契约"),
+            ("NEXT-ACTIONS.md", "下一步"), ("STATE.md", "当前状态"), ("INDEX.md", "全量索引")]
+    L += ["## 项目文档", "", "| 文档 | 用途 |", "|---|---|"]
+    for fn, desc in docs:
+        p = os.path.join(root, fn)
+        if os.path.isfile(p):
+            L.append("| %s | %s |" % (_md_link(vdir, p, fn), desc))
+    L += ["", "## 周 / 月复盘", ""]
+    rdir = os.path.join(root, "reviews")
+    revs = sorted([x for x in os.listdir(rdir) if x.endswith(".md")], reverse=True) if os.path.isdir(rdir) else []
+    if revs:
+        L += ["| 复盘 | 文件 |", "|---|---|"]
+        for fn in revs:
+            L.append("| %s | %s |" % (fn[:-3], _md_link(vdir, os.path.join(rdir, fn), fn)))
+    else:
+        L += ["> [!note] 尚无复盘", "> 用 `journal.py review --period weekly` 生成骨架。", ""]
+    L += ["", "## 可售资产包", ""]
+    pdir = os.path.join(root, "publish")
+    pubs = sorted([x for x in os.listdir(pdir) if os.path.isdir(os.path.join(pdir, x))], reverse=True) if os.path.isdir(pdir) else []
+    if pubs:
+        L += ["| 日期 | 入口 |", "|---|---|"]
+        for d in pubs:
+            idx = os.path.join(pdir, d, "INDEX.md")
+            if os.path.isfile(idx):
+                L.append("| %s | %s |" % (d, _md_link(vdir, idx, "INDEX.md")))
+            else:
+                L.append("| %s | （缺少 INDEX.md） |" % d)
+        L += ["", "> 对外发布前先人工复核 `_redaction-report.md`；vault 本身默认不公开。", ""]
+    else:
+        L += ["> [!note] 尚无资产包", "> 结项后用 `journal.py publish` 生成脱敏资产包。", ""]
+    months = {}
+    for d in f["days"]:
+        months[d[:7]] = months.get(d[:7], 0) + 1
+    if months:
+        L += ["", "## 日记分布", "", "| 月份 | 天数 |", "|---|---|"]
+        for m in sorted(months, reverse=True):
+            L.append("| %s | %d |" % (m, months[m]))
+    return "\n".join(L).rstrip() + "\n"
+
+
+def render_obsidian(root, t):
+    f = collect_facts(root, t)
+    return {
+        "HOME.md": _render_home(root, t, f),
+        "_views/decisions.md": _render_decisions(root, t, f),
+        "_views/problems.md": _render_problems(root, t, f),
+        "_views/milestones.md": _render_milestones(root, t, f),
+        "_views/metrics.md": _render_metrics(root, t, f),
+        "_views/reviews.md": _render_reviews(root, t, f),
+    }
+
+
+def _write_obsidian_config(root, force=False, obsidian_version=""):
+    d = os.path.join(root, ".obsidian")
+    made, skipped = [], []
+    core = OBSIDIAN_CORE
+    if obsidian_version and _version_lt(obsidian_version, "1.9.0"):
+        core = OBSIDIAN_CORE_ARRAY
+    for fn, data in [("app.json", OBSIDIAN_APP), ("daily-notes.json", OBSIDIAN_DAILY),
+                     ("core-plugins.json", core)]:
+        p = os.path.join(d, fn)
+        if os.path.isfile(p) and not force:
+            # 兼容 Obsidian 1.9 前后的两种 core-plugins.json 结构：
+            # 1.8.x 及更早是数组，1.9+ 是对象。只在能识别且类型不匹配时迁移。
+            if fn == "core-plugins.json":
+                try:
+                    cur = json.loads(read_text(p))
+                except Exception:
+                    cur = None
+                if isinstance(cur, dict) and isinstance(data, list):
+                    write_text(p, json.dumps([k for k, v in cur.items()
+                                              if v and k != "bases"] or data,
+                                             ensure_ascii=False, indent=2) + "\n")
+                    made.append(fn + "（对象→数组）")
+                    continue
+                if isinstance(cur, list) and isinstance(data, dict):
+                    write_text(p, json.dumps({k: (k in cur) for k in data},
+                                             ensure_ascii=False, indent=2) + "\n")
+                    made.append(fn + "（数组→对象）")
+                    continue
+            skipped.append(fn)
+            continue
+        write_text(p, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        made.append(fn)
+    gi = os.path.join(root, ".gitignore")
+    if not os.path.isfile(gi):
+        write_text(gi, OBSIDIAN_GITIGNORE)
+        made.append(".gitignore")
+    return made, skipped
+
+
+def _find_obsidian_exe():
+    """轻量探测 Obsidian 可执行文件；完整安装/检测见 install-obsidian.py。"""
+    cands = []
+    state = os.path.join(os.path.expanduser("~"), ".project-journal", "obsidian.json")
+    try:
+        st = json.loads(read_text(state))
+        for k in ("path", "install_dir"):
+            p = st.get(k) or ""
+            if p:
+                cands.append(p if p.lower().endswith(".exe") else os.path.join(p, "Obsidian.exe"))
+    except Exception:
+        pass
+    local = os.environ.get("LOCALAPPDATA", "")
+    if local:
+        cands += [os.path.join(local, "Programs", "Obsidian", "Obsidian.exe"),
+                  os.path.join(local, "Obsidian", "Obsidian.exe")]
+    for pf in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)")):
+        if pf:
+            cands.append(os.path.join(pf, "Obsidian", "Obsidian.exe"))
+    cands += [r"D:\Obsidian\Obsidian.exe", r"D:\Programs\Obsidian\Obsidian.exe",
+              r"D:\Program Files\Obsidian\Obsidian.exe",
+              r"D:\Program Files (x86)\Obsidian\Obsidian.exe"]
+    for p in cands:
+        if p and os.path.isfile(p):
+            return p
+    return ""
+
+
+def _obsidian_version(exe):
+    if not exe or not os.path.isfile(exe):
+        return ""
+    if os.name == "nt":
+        q = exe.replace("'", "''")
+        try:
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                 "(Get-Item -LiteralPath '%s').VersionInfo.FileVersion" % q],
+                capture_output=True, text=True, errors="ignore", timeout=15)
+            m = re.search(r"\d+\.\d+\.\d+", r.stdout or "")
+            return m.group(0) if m else ""
+        except Exception:
+            return ""
+    return ""
+
+
+def _version_lt(ver, minimum):
+    try:
+        return tuple(map(int, str(ver).split(".")[:3])) < tuple(map(int, str(minimum).split(".")[:3]))
+    except Exception:
+        return False
+
+
+def cmd_obsidian(args):
+    root = require_root(args)
+    t = load_tracker(root)
+    files = render_obsidian(root, t)
+    changed = []
+    for relp, content in files.items():
+        p = os.path.join(root, relp.replace("/", os.sep))
+        if read_text(p) != content:
+            changed.append(relp)
+            if not args.check:
+                write_text(p, content)
+    if args.check:
+        if changed:
+            say("[STALE] 视图与源数据不一致：")
+            for x in changed:
+                say("  - " + x)
+            say("       重跑：python journal.py obsidian --root \"%s\"" % root.replace(os.sep, "/"))
+            return 1
+        say("[OK] Obsidian 视图已是最新（%d 个文件）" % len(files))
+        return 0
+    obs_exe = _find_obsidian_exe()
+    obs_ver = _obsidian_version(obs_exe) if obs_exe else ""
+    made, skipped = _write_obsidian_config(root, args.force, obs_ver)
+    opened = False
+    if getattr(args, "open", False):
+        if obs_exe:
+            try:
+                subprocess.Popen([obs_exe, root])
+                opened = True
+            except OSError:
+                opened = False
+    say("[OK] Obsidian vault：%s" % root.replace(os.sep, "/"))
+    say("     HOME.md + %d 个视图%s" % (len(files) - 1, "（已更新）" if changed else "（无变化）"))
+    if obs_exe:
+        say("     Obsidian：%s（%s）" % (obs_exe.replace(os.sep, "/"), obs_ver or "版本未知"))
+        if obs_ver and _version_lt(obs_ver, "1.8.0"):
+            say("     [WARN] 版本低于 1.8.0；建议升级：python \"%s\" --yes --force"
+                % os.path.join(HERE, "install-obsidian.py").replace(os.sep, "/"))
+    if made:
+        say("     配置：%s" % " . ".join(made))
+    if skipped:
+        say("     配置已存在（未覆盖）：%s" % " . ".join(skipped))
+    if getattr(args, "install_missing", False) and not obs_exe:
+        ic = os.path.join(HERE, "install-obsidian.py")
+        if os.path.isfile(ic):
+            say("     Obsidian 未安装，开始静默安装 ...")
+            rc = subprocess.call([sys.executable, ic, "--yes"])
+            if rc != 0:
+                say("     [WARN] 自动安装未完成，请手动运行：python \"%s\" --yes" % ic.replace(os.sep, "/"))
+            else:
+                obs_exe = _find_obsidian_exe()
+                obs_ver = _obsidian_version(obs_exe) if obs_exe else ""
+                if obs_exe:
+                    say("     Obsidian：%s（%s）" % (obs_exe.replace(os.sep, "/"), obs_ver or "版本未知"))
+        else:
+            say("     [WARN] 未找到 install-obsidian.py")
+    if opened:
+        say("     已尝试用 Obsidian 打开该目录")
+    say("")
+    say("下一步：")
+    say("  1) Obsidian →「打开文件夹作为仓库」→ 选择 %s" % root.replace(os.sep, "/"))
+    say("  2) 从 HOME.md 进入五个视图（_views/）")
+    say("  3) 收工落盘后重跑本命令；只检查是否过期加 --check")
+    if not obs_exe:
+        say("  ! 未检测到 Obsidian；一键安装：python \"%s\" --yes"
+            % os.path.join(HERE, "install-obsidian.py").replace(os.sep, "/"))
+    return 0
+
+
 def cmd_vault_index(args):
     root = os.path.abspath(args.root) if args.root else os.getcwd()
     if not os.path.isdir(root):
@@ -1862,6 +2489,7 @@ def cmd_doctor(args):
     fails, warns = [], []
     release_note = None
     need = ["SKILL.md", "manifest.json", "CHANGELOG.md", "scripts/journal.py", "scripts/selftest.py",
+            "scripts/install-global.py", "scripts/install-obsidian.py", "scripts/setup.py",
             "references/00-protocol.md", "references/01-taxonomy.md", "references/02-writing-guide.md",
             "references/03-cadence.md", "references/04-monetization.md", "references/05-closeout.md",
             "references/06-digital-asset.md", "references/07-troubleshooting.md",
@@ -1875,6 +2503,11 @@ def cmd_doctor(args):
     m = skill_manifest()
     if not m.get("version"):
         fails.append("manifest.json 缺少 version")
+    opt = ((m.get("requires") or {}).get("optional") or {})
+    if "obsidian" not in opt:
+        warns.append("manifest.json 未声明 requires.optional.obsidian（可视化依赖关系不完整）")
+    elif not os.path.isfile(os.path.join(SKILL_DIR, opt["obsidian"].get("installer", ""))):
+        fails.append("manifest.json 声明的 Obsidian 安装器不存在：" + str(opt["obsidian"].get("installer")))
     ch = read_text(os.path.join(SKILL_DIR, "CHANGELOG.md"))
     mtop = re.search(r"^##\s*\[([0-9]+\.[0-9]+\.[0-9]+)\]", ch, re.M)
     if not mtop:
@@ -1886,7 +2519,8 @@ def cmd_doctor(args):
         if not os.path.isfile(os.path.join(SKILL_DIR, "references", ref)):
             fails.append("SKILL.md 引用了不存在的文件：references/" + ref)
     import py_compile
-    for fn in ["scripts/journal.py", "scripts/selftest.py"]:
+    for fn in ["scripts/journal.py", "scripts/selftest.py", "scripts/install-global.py",
+               "scripts/install-obsidian.py", "scripts/setup.py"]:
         p = os.path.join(SKILL_DIR, fn)
         if os.path.isfile(p):
             try:
@@ -1938,6 +2572,22 @@ def cmd_doctor(args):
     openn = [x for x in ents if x.get("status") in ("open", "proposed", "in-progress")]
     if args.release:
         say("[INFO] 远程校验：%s" % (release_note or "未取得结论"))
+    cfgp = os.path.join(os.path.expanduser("~"), ".project-journal", "config.json")
+    if os.path.isfile(cfgp):
+        say("[INFO] 全局配置：%s" % cfgp.replace(os.sep, "/"))
+    else:
+        say("[INFO] 全局配置未写入；一键安装：python \"%s\" --yes"
+            % os.path.join(HERE, "setup.py").replace(os.sep, "/"))
+    obs_exe = _find_obsidian_exe()
+    if obs_exe:
+        obs_ver = _obsidian_version(obs_exe)
+        say("[INFO] Obsidian：%s（%s，可选）" % (
+            obs_exe.replace(os.sep, "/"), obs_ver or "版本未知"))
+        if obs_ver and _version_lt(obs_ver, "1.8.0"):
+            warns.append("Obsidian %s 低于建议的 1.8.0；视图可能不完整（不影响记录）" % obs_ver)
+    else:
+        say("[INFO] Obsidian：未安装（可选；python \"%s\" --yes）"
+            % os.path.join(HERE, "install-obsidian.py").replace(os.sep, "/"))
     for f in fails:
         say("[FAIL] %s" % f)
     for w in warns:
@@ -2252,6 +2902,13 @@ def build_parser():
     s.add_argument("--depth", type=int, default=4)
     s.add_argument("--json", action="store_true", help="输出机器可读 JSON")
 
+    s = add("obsidian", "生成 Obsidian 驾驶舱与五个视图（只读源数据，不改日记/档案）")
+    s.add_argument("--check", action="store_true", help="只检查视图是否过期（过期返回 1）")
+    s.add_argument("--force", action="store_true", help="覆盖已有 .obsidian 配置")
+    s.add_argument("--install-missing", dest="install_missing", action="store_true",
+                   help="未检测到 Obsidian 时调用 install-obsidian.py 静默安装")
+    s.add_argument("--open", action="store_true", help="生成后用 Obsidian 打开该目录")
+
     s = sub.add_parser("vault-index", help="跨项目总览")
     s.add_argument("--root")
     return p
@@ -2262,6 +2919,7 @@ HANDLERS = {
     "add": cmd_add, "update": cmd_update, "metric": cmd_metric, "ledger": cmd_ledger,
     "stage": cmd_stage, "index": cmd_index, "lint": cmd_lint, "review": cmd_review,
     "closeout": cmd_closeout, "publish": cmd_publish, "vault-index": cmd_vault_index,
+    "obsidian": cmd_obsidian,
     "upgrade": cmd_upgrade, "evolve": cmd_evolve, "evolve-list": cmd_evolve_list,
     "evolve-apply": cmd_evolve_apply, "doctor": cmd_doctor, "health": cmd_health,
 }

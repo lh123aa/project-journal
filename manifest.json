@@ -1,6 +1,6 @@
 {
   "name": "project-journal",
-  "version": "1.5.0",
+  "version": "1.6.2",
   "category": "Project Tracking / Knowledge Assetization",
   "description": "Continuous project process tracking and experience-asset engine. One call bootstraps an independent Markdown record folder plus a session anchor in AGENTS.md; afterwards every session auto-resumes and captures decisions, problems, solutions, daily execution, metrics and revenue until monetization succeeds or fails, then publishes a redacted sellable case-study asset pack.",
   "compat": [
@@ -15,13 +15,25 @@
   "entry": "SKILL.md",
   "scripts": [
     "scripts/journal.py",
-    "scripts/selftest.py"
+    "scripts/selftest.py",
+    "scripts/install-global.py",
+    "scripts/install-obsidian.py",
+    "scripts/setup.py"
   ],
   "requires": {
     "python": ">=3.8",
-    "third_party": []
+    "third_party": [],
+    "optional": {
+      "obsidian": {
+        "min_version": "1.8.0",
+        "purpose": "可视化驾驶舱与五个视图（HOME.md + _views/）；不安装也能正常记录",
+        "installer": "scripts/install-obsidian.py",
+        "setup": "scripts/setup.py",
+        "policy": "官方 GitHub + Authenticode 验签；D 盘优先；安装器忽略 /D 时移动到 D 盘并建 junction；失败保留默认盘并告警"
+      }
+    }
   },
-  "updated": "2026-10-09",
+  "updated": "2026-10-21",
   "self_evolution": {
     "ledger": "evolution/ledger.json",
     "view": "evolution/LEDGER.md",

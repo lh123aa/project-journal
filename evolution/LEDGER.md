@@ -1,10 +1,10 @@
 # 自我迭代台账 . project-journal
 
-> 由 journal.py 自动生成（2026-10-09T15:28:19），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
+> 由 journal.py 自动生成（2026-10-21T14:56:52），请勿手工编辑；改 ledger.json 后重跑任意 evolve 命令即可重建本视图。
 > 用途：记录本 skill 自身在运行中暴露的 bug / 逻辑问题 / 易用性问题及修订历史。
 > 闭环流程与治理规则见 references/08-self-evolution.md。
 
-- 当前版本：v1.4.2 . 条目 21 条 (applied 21)
+- 当前版本：v1.6.2 . 条目 24 条 (applied 24)
 
 | ID | 日期 | 类别 | 严重度 | 状态 | 标题 | 修复版本 |
 |---|---|---|---|---|---|---|
@@ -29,6 +29,9 @@
 | EV-0019 | 2026-10-09 | bug | medium | applied | evolve-apply 非原子 + 并发发布导致版本幽灵（项目记录引用不存在的 v1.3.6） | 1.4.2 |
 | EV-0020 | 2026-10-09 | feature | medium | applied | 缺少跨项目批量巡检与批量升级（7 个项目需逐个手工处理漂移） | 1.5.0 |
 | EV-0021 | 2026-10-09 | bug | high | applied | 命令 health 崩溃：'Namespace' object has no attribute 'json' | 1.4.1 |
+| EV-0022 | 2026-10-21 | feature | high | applied | 新增 Obsidian 可视化驾驶舱与一键安装（setup.py） | 1.6.0 |
+| EV-0023 | 2026-10-21 | bug | high | applied | Obsidian 官方签名主体是 Dynalist，验签误判导致首装失败 | 1.6.1 |
+| EV-0024 | 2026-10-21 | bug | low | applied | LEDGER.md 顶部版本落后一个 release | 1.6.2 |
 
 ## EV-0001 案例研究缺少「关键认知与讨论」车道，insight 正文进不了资产包
 
@@ -570,3 +573,159 @@ AttributeError: 'Namespace' object has no attribute 'json'
 修复 health 命令缺少 --json 参数导致的崩溃（该崩溃在首次真实运行时被崩溃自动记录机制捕获为 EV-0021）；补齐参数并新增第 38 项回归用例
 
 - 修复版本：v1.4.1（2026-10-09）
+
+## EV-0022 新增 Obsidian 可视化驾驶舱与一键安装（setup.py）
+
+- 日期：2026-10-21 . 类别：feature . 严重度：high . 状态：applied . 发现于：v1.5.0
+- 相关项目：project-journal
+- 复现命令：python scripts/setup.py --yes && python scripts/journal.py obsidian --root <记录根> --check
+- 证据：scripts/selftest.py 50/50；install-obsidian --check 识别本机 1.8.7；obsidian --check 返回 0
+
+**症状 / 期望**
+
+```
+## 现象
+
+项目记录只有 Markdown 文件，缺少一眼看懂"现在在哪、成败标尺、未闭环、下一步"的可视化入口；首次安装还要手工注册技能、单独安装 Obsidian、手工建 vault，无法做到装完即用。
+
+## 影响
+
+- 新用户要在多个步骤之间来回切换，容易漏装 Obsidian 或漏注册工具
+- 记录本身可用，但项目状态需要逐文件阅读，复盘和汇报成本高
+- 没有一个"零插件、不破坏 append-only、不产生双真源"的可视化层
+
+## 修复
+
+- 新增 `journal.py obsidian`：在记录根生成 `HOME.md` + `_views/` 五个视图（决策/问题/里程碑/数据/复盘）
+- 生成层只读 `journal/`、`records/`、`metrics/`，不改写任何日记或档案；视图幂等可重建；`--check` 检测过期返回 1
+- 只用 Obsidian 原生 Markdown / Mermaid / Properties / Canvas，零第三方插件；链接用相对 Markdown
+- 新增 `scripts/install-obsidian.py`：注册表/常见路径/状态文件检测，官方 GitHub 下载，Authenticode 验签，NSIS/Squirrel 静默安装，D 盘优先，`/D` 被忽略时移动 + junction 回退，写状态文件
+- 新增 `scripts/setup.py`：一条命令串起技能注册、Obsidian 检测/安装、起始 vault、项目接入、全局配置、`--check`/`--json`/`--open`
+- `manifest.json` 增加 `scripts` 与 `requires.optional.obsidian`（min 1.8.0）；`doctor` 增加脚本/可选依赖/全局配置/Obsidian 检查
+- Obsidian 1.8.x 数组格式与 1.9+ 对象格式的 `core-plugins.json` 自动识别并迁移
+- 新增 12 项回归用例（Obsidian 生成/幂等/无死链/过期、安装器 dry-run、setup 一键/check/json/记录目录、manifest 可选依赖）
+
+## 证据
+
+- `scripts/selftest.py`：50/50 通过
+- `python scripts/install-obsidian.py --check`：识别本机 Obsidian 1.8.7（`D:\Program Files (x86)\Obsidian\Obsidian.exe`）
+- `python scripts/journal.py obsidian --root <示例项目> --check`：返回 0；重复生成返回 0 且内容不变
+- 五个视图无死链；`HOME.md` 链接到全部视图与档案
+
+## 复现
+
+```bash
+python scripts/setup.py --yes
+python scripts/journal.py obsidian --root "<项目根>/project-journal" --check
+python scripts/selftest.py
+```
+```
+
+**修复**
+
+新增 Obsidian 可视化层（HOME.md + 5 视图，零插件、不改记录）与一键安装 setup.py（技能注册 + Obsidian 静默安装 + 起始 vault + 全局配置）；补充安装器、版本兼容、回归用例与文档。
+
+- 修复版本：v1.6.0（2026-10-21）
+
+## EV-0023 Obsidian 官方签名主体是 Dynalist，验签误判导致首装失败
+
+- 日期：2026-10-21 . 类别：bug . 严重度：high . 状态：applied . 发现于：v1.6.0
+- 相关项目：project-journal
+- 复现命令：python scripts/install-obsidian.py --yes
+- 证据：Get-AuthenticodeSignature 显示 CN=Dynalist Inc；修复前 trusted_signer 返回 False
+
+**症状 / 期望**
+
+```
+## 现象
+
+`install-obsidian.py` 的 Authenticode 验签只接受签名主体里包含 `obsidian` 的证书。但 Obsidian 官方安装包/客户端的实际签名主体是 **`CN=Dynalist Inc`**（Obsidian 的母公司），不包含 `obsidian`。因此首次在一台干净机器上安装时，即使下载的是官方正版安装包，也会被判为“签名主体不是 Obsidian”并中止。
+
+## 影响
+
+- 阻断首次安装：`setup.py --yes` 在无 Obsidian 的机器上会下载 300+ MB 安装包，然后在验签阶段失败
+- 用户可能误以为下载源不安全，或被迫使用 `--no-verify` 绕过安全校验
+- 本机已有 Obsidian 1.8.7，所以此前 `setup.py` 直接复用，没有触发该路径；属于审查时发现的潜在首装故障
+
+## 证据
+
+```powershell
+Get-AuthenticodeSignature -LiteralPath "D:\Program Files (x86)\Obsidian\Obsidian.exe"
+# Status: Valid
+# SignerCertificate.Subject: CN=Dynalist Inc, O=Dynalist Inc, L=Oakville, S=Ontario, C=CA
+```
+
+修复前 `trusted_signer("CN=Dynalist Inc")` 返回 False；修复后返回 True。
+
+## 修复
+
+- `trusted_signer(subject)` 同时接受 `obsidian` 与 `dynalist`（大小写不敏感）
+- `verify_signature` 改用该函数，错误信息改为“签名主体不是 Obsidian/Dynalist”
+- 新增回归用例：接受 `CN=Dynalist Inc` 与 `CN=Obsidian.md`，拒绝 `CN=Evil Corp`
+- 自测 51/51 通过
+
+## 复现
+
+```bash
+python scripts/install-obsidian.py --dry-run --version 1.14.4
+# 修复前无法在干净机器完成 --yes；修复后可用官方 Dynalist 证书通过验签
+```
+```
+
+**修复**
+
+修复 Obsidian 官方签名主体为 Dynalist 时的验签误判：trusted_signer 同时接受 Obsidian/Dynalist，并新增回归用例，避免干净机器首次安装被错误中止。
+
+- 修复版本：v1.6.1（2026-10-21）
+
+## EV-0024 LEDGER.md 顶部版本落后一个 release
+
+- 日期：2026-10-21 . 类别：bug . 严重度：low . 状态：applied . 发现于：v1.6.1
+- 相关项目：project-journal
+- 复现命令：python scripts/journal.py evolve-apply --id EV-XXXX --bump patch --summary x；对比 LEDGER.md 与 manifest
+- 证据：v1.6.1 发布后 LEDGER.md 顶部为 v1.6.0；ledger_md 使用的是旧 manifest 版本
+
+**症状 / 期望**
+
+```
+## 现象
+
+`journal.py evolve-apply` 发布后，`evolution/LEDGER.md` 顶部的“当前版本”会落后一个版本：v1.6.1 发布后仍显示 `v1.6.0`。
+
+## 影响
+
+- 台账视图与 `manifest.json` / `CHANGELOG.md` 版本不一致，读台账的人会误判当前版本
+- 不影响功能，但破坏“单一版本真源”的可信度
+- 每次 `evolve-apply` 都会复现，属于系统性小问题
+
+## 根因
+
+`ledger_md(led)` 顶部使用 `skill_version()`（读 `manifest.json`），而 `evolve-apply` 采用“两阶段原子发布”：先写 CHANGELOG / 台账 / LEDGER.md，**最后**才写 manifest。生成 LEDGER.md 时 manifest 还是旧版本，所以头部落后一版。台账 JSON 里的 `led["version"]` 已经是新版本。
+
+## 证据
+
+```powershell
+python scripts/journal.py --version          # 1.6.1
+Select-String evolution/LEDGER.md -Pattern '当前版本'  # v1.6.0
+```
+
+## 修复
+
+- `ledger_md` 优先使用 `led.get("version")`，缺失时才回退到 `skill_version()`
+- 新增第 52 项回归用例：`ledger_md({"version": "9.9.9", ...})` 必须输出 `v9.9.9`
+- 自测 52/52 通过
+
+## 复现
+
+```bash
+python scripts/journal.py evolve-apply --id EV-XXXX --bump patch --summary "..."
+python scripts/journal.py --version
+# 检查 evolution/LEDGER.md 顶部版本是否一致
+```
+```
+
+**修复**
+
+修复 LEDGER.md 顶部版本落后一个 release：ledger_md 优先使用台账版本号，并新增第 52 项回归用例。
+
+- 修复版本：v1.6.2（2026-10-21）

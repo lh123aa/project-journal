@@ -31,10 +31,38 @@
 
 ## 1. 安装
 
-### 方式 A：全局注册（推荐，所有 Agent 工具可用）
+### 方式 A：一条命令（推荐，装完即用）
 
 ```bash
 git clone https://github.com/lh123aa/project-journal.git ~/.agents/skills/project-journal
+# Windows: %USERPROFILE%\.agents\skills\project-journal
+python ~/.agents/skills/project-journal/scripts/setup.py --yes
+```
+
+它会一次完成：
+
+| 步骤 | 做什么 |
+|---|---|
+| 1/4 | 注册到 Claude Code / opencode / Cursor / Codex CLI / Gemini CLI / Windsurf |
+| 2/4 | 检测 Obsidian；没有则官方 GitHub 下载 → Authenticode 验签 → 静默安装（**D 盘优先**，不可用回退默认盘） |
+| 3/4 | 创建起始 vault（Windows 默认 `D:\ProjectJournal-Vault`） |
+| 4/4 | 写 `~/.project-journal/config.json` |
+
+装完即可用。常用选项：
+
+```bash
+python .../scripts/setup.py --no-obsidian                 # 只记录，不装 Obsidian
+python .../scripts/setup.py --yes --project "<项目根>"     # 同时接入一个已有项目
+python .../scripts/setup.py --check                      # 只检查，不写文件
+python .../scripts/setup.py --yes --open                 # 装完用 Obsidian 打开 vault
+python .../scripts/setup.py --require-obsidian --yes     # Obsidian 装失败就中止
+```
+
+已有 Obsidian 1.8+ 会直接复用，不重复下载；安装位置不强制搬迁。
+
+### 方式 B：只注册技能（不装 Obsidian / 不建 vault）
+
+```bash
 python ~/.agents/skills/project-journal/scripts/install-global.py
 ```
 
@@ -50,7 +78,7 @@ python ~/.agents/skills/project-journal/scripts/install-global.py
 
 先看它要做什么：`--check`；强制复制而不链接：`--copy`；自定义家目录：`--home <目录>`。
 
-### 方式 B：只给某一个项目用
+### 方式 C：只给某一个项目用
 
 把仓库放进项目里（例如 `<项目>/tools/project-journal`），在项目 `AGENTS.md` 里写一行"跟踪项目时读 tools/project-journal/SKILL.md"即可。
 
@@ -58,31 +86,33 @@ python ~/.agents/skills/project-journal/scripts/install-global.py
 
 技能真源（这个 git 仓库）**可以放在任意位置**，只要各工具的发现路径指向它即可。当前一种典型布局：
 
-`@
+```
 真源      E:\程序\github\我的项目\project-journal        ← git 仓库，随时 git pull
 发现路径  %USERPROFILE%\.agents\skills\project-journal  ← junction 指回真源（ASCII 短路径，DSH 等按此发现）
 工具链接  %USERPROFILE%\.claude\skills\project-journal  ← junction 指回真源
-`@
+```
 
 为什么保留 `~/.agents/skills/project-journal` 这个 junction：DSH 等宿主按该路径发现技能，
 而且已经写进各项目 `AGENTS.md` 锚点里的绝对命令也依赖它。保留它，**就不需要改动任何已有项目**。
 
 移动真源后按三步走：
 
-`@bash
+```bash
 # 1) 在原位置建 junction 指回新位置
 cmd /c mklink /J "%USERPROFILE%\.agents\skills\project-journal" "E:\程序\github\我的项目\project-journal"
 # 2) 到新位置重跑注册（重建各工具链接与托管块）
 python "E:\程序\github\我的项目\project-journal\scripts\install-global.py"
 # 3) 已有项目无需改动；如契约版本落后再跑一次
 python "E:\程序\github\我的项目\project-journal\scripts\journal.py" upgrade --root "<项目根>\project-journal"
-`@
+```
 
 > 移动只影响"工具从哪里找到技能"，**不影响任何项目的记录数据**。`journal.py upgrade` 只动 tracker/契约/锚点，不改写日记与档案。
 
 ### 依赖
 
-**Python 3.8+，零第三方依赖**。任何能执行 shell 的 Agent 工具都能跑。
+**Python 3.8+，仅标准库，零第三方 Python 依赖**。任何能执行 shell 的 Agent 工具都能跑。
+
+Obsidian 是可选可视化层：**1.8+**，零第三方插件；已安装会复用，不装也不影响记录与资产化。
 
 ## 2. 五分钟上手
 
@@ -102,6 +132,14 @@ python $S init --project "我的项目" --stage S0 --currency USD \
 > **成功线与止损线必须在这里写死。** 它们是项目结束时判定"变现成功还是失败"的唯一客观标尺；没有它们，复盘只能凭感觉。
 
 然后打开 `project-journal/CHARTER.md` 补全目标与假设。
+
+想直接看可视化驾驶舱（可选）：
+
+```bash
+python $S obsidian --root project-journal --open
+```
+
+会在记录目录生成 `HOME.md` + `_views/` 五个视图，并用 Obsidian 打开。没装 Obsidian 会提示安装命令。
 
 ## 3. 日常循环（每次会话）
 
@@ -126,6 +164,9 @@ python $S stage  --root $R --set S5 --why "拿到首单"
 #    手工编辑 project-journal/NEXT-ACTIONS.md
 python $S index --root $R
 python $S lint  --root $R
+
+# ④ 可视化（可选）：刷新驾驶舱；只检查是否过期用 --check
+python $S obsidian --root $R
 ```
 
 ## 4. 记什么（MUST-RECORD 触发器）
@@ -148,6 +189,8 @@ python $S lint  --root $R
 
 | 场景 | 命令 |
 |---|---|
+| 一键安装 | `scripts/setup.py --yes`（`--no-obsidian` 跳过 Obsidian） |
+| 安装自检 | `scripts/setup.py --check` / `scripts/install-obsidian.py --check` |
 | 立项 | `init --project "名称" --success ... --stop-loss ...` |
 | 开工 | `resume --root <R>` |
 | 记录 | `add --root <R> --type <类型> --title "..." [--body-file f] [--link ADR-0001]` |
@@ -155,6 +198,7 @@ python $S lint  --root $R
 | 数字 | `metric` / `ledger` |
 | 阶段 | `stage --root <R> --set S3 --why "..."` |
 | 收尾 | `index` + `lint --root <R>` |
+| 可视化 | `obsidian --root <R> [--open]`；过期检查 `--check` |
 | 周月复盘 | `review --root <R> --period weekly` → 补写分析段 |
 | 项目终止 | `closeout --root <R> --outcome success\|failure\|pivot\|paused` |
 | 资产化 | `publish --root <R>`（脱敏 → 8 个可销售文件） |
@@ -179,6 +223,8 @@ python $S lint  --root $R
 
 - 一个项目一个记录目录，**都在各自项目根下**，随项目 git 走
 - 想集中资产化：把多个 `<项目根>/project-journal` 汇总到一个 vault 目录，跑 `vault-index --root <vault>` 得到跨项目总览（L2/L3 资产：方法论、数据库）
+- 也可以用 `setup.py --yes --project "<项目根>" --vault "<集中 vault>"` 把新项目直接建在 vault 子目录里
+- 可视化视图按项目生成：每个记录目录各有自己的 `HOME.md` + `_views/`；集中式 vault 的父级用 `VAULT-INDEX.md` 总览。**不要把多个项目指向同一个 `--root`**
 - 一个项目多人/多 Agent 协作：各自跑 `add`，最后一个人跑 `index` + `lint`
 
 ## 8. 它会自己变好（自我迭代）
@@ -216,6 +262,18 @@ A：不能。`lint` 会扫描并在 `publish` 强制脱敏；台账里也只写�
 
 **Q：记录目录能改位置吗？**
 A：约定是 `<项目根>/project-journal/`（锚点靠它自动定位）。要用别的名字：`--root "<项目根>/<文件夹>" --project-root "<项目根>"`。
+
+**Q：没装 Obsidian 能用吗？**
+A：能。记录、复盘、结项、资产化都不依赖 Obsidian；它只是可选可视化层。安装时加 `--no-obsidian`，或之后随时运行 `scripts/install-obsidian.py --yes` 补装。
+
+**Q：已有 Obsidian 会被重复安装吗？**
+A：不会。检测到 1.8+ 会直接复用；只有 `install-obsidian.py --force` 才会重装。安装位置也不强制搬迁。
+
+**Q：视图会改我的日记/档案吗？**
+A：不会。`obsidian` 只读源数据，生成 `HOME.md` + `_views/`；重复生成幂等。`--check` 只报告是否过期，返回 1，不写文件。
+
+**Q：一键安装失败怎么办？**
+A：先跑 `python scripts/setup.py --check` 看是哪一步。Obsidian 下载/验签失败不会影响技能本身（除非加 `--require-obsidian`）；可稍后重跑 `python scripts/install-obsidian.py --yes`，再重跑 `setup.py --yes`。
 
 **Q：怎么升级？**
 A：在 skill 真源目录 `git pull`。用 junction 安装的工具会自动跟随；用 `--copy` 安装的需要重跑 `install-global.py`。

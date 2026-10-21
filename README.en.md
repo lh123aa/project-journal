@@ -13,7 +13,7 @@
 - **No diary spam** — it only captures what carries judgment, conclusions, or numbers: decisions, blockers, solutions, insights, real metrics.
 - **Closes the loop** — you write your success and stop-loss lines up front. At closeout, the tool judges the outcome against them and generates a case study / playbook / lessons asset pack.
 
-[Install (30s)](#install-30-seconds) ｜ [Full methodology pack ↓](#want-the-full-methodology) ｜ [中文](README.md)
+[Install (one command)](#install-one-command) ｜ [Full methodology pack ↓](#want-the-full-methodology) ｜ [中文](README.md)
 
 ---
 
@@ -33,16 +33,35 @@
 Natural language works too ("start tracking this project", "log today's work", "how's this project doing", "can we sell it yet").
 Chinese keywords also supported: 跟踪项目 / 记一下 / 项目状态 / 复盘 / 结项 / 出资产.
 
-## Install (30 seconds)
+## Install (one command)
 
 ```bash
 git clone https://github.com/lh123aa/project-journal.git ~/.agents/skills/project-journal
 # Windows: %USERPROFILE%\.agents\skills\project-journal
-python ~/.agents/skills/project-journal/scripts/install-global.py   # register to all tools
+python ~/.agents/skills/project-journal/scripts/setup.py --yes
+```
+
+This single command:
+
+- registers the skill with Claude Code / opencode / Cursor / Codex CLI / Gemini CLI / Windsurf
+- detects Obsidian; if missing, downloads the official GitHub release, verifies its Authenticode signature, and installs it silently (**prefers the D: drive** on Windows, falls back to the system drive)
+- creates a starter vault (Windows default: `D:\ProjectJournal-Vault`)
+- writes `~/.project-journal/config.json`, so the skill is ready to use
+
+Skip Obsidian (record only, no views):
+
+```bash
+python ~/.agents/skills/project-journal/scripts/setup.py --no-obsidian
+```
+
+Attach an existing project in one go:
+
+```bash
+python ~/.agents/skills/project-journal/scripts/setup.py --yes --project "G:/path/to/your-project"
 ```
 
 Covers: Claude Code / opencode / Cursor / Codex CLI / Gemini CLI / Windsurf.
-Requirements: **Python 3.8+, standard library only. Zero third-party dependencies.**
+Requirements: **Python 3.8+, standard library only.** Obsidian 1.8+ is optional; an existing install is reused instead of downloading again.
 
 > The first time you run "track this project", it asks you to write your **success line** and **stop-loss line** — the only objective yardstick that will judge whether the project succeeded. Don't skip it.
 
@@ -72,12 +91,36 @@ Numbers   metrics.csv · ledger.csv (metrics, income & cost)
 Output    publish/<date>/           8 redacted, sellable asset files
 ```
 
+## Visual cockpit (optional)
+
+`journal.py obsidian` adds a **generated cockpit + five views** on top of the record folder:
+
+```
+HOME.md                  where you are / success & stop-loss lines / open loops / next actions / recent entries
+_views/decisions.md      decisions: why you chose this
+_views/problems.md       problems & solutions: where you got stuck and how you got around it
+_views/milestones.md     milestones: how far the project has come
+_views/metrics.md        numbers: real metrics, income & cost
+_views/reviews.md        reviews & assets: retros, docs, sellable packs
+```
+
+- **Zero third-party plugins** — native Markdown / Mermaid / Properties / Canvas only; no Dataview, no Templater
+- **Never touches the record** — `journal/`, `records/`, `metrics/` are left byte-for-byte intact
+- **No double source of truth** — views are regenerated from the source; `--check` reports staleness with exit code 1
+- **Readable outside Obsidian** — relative Markdown links, so GitHub and VS Code render them fine
+
+```bash
+python <skill>/scripts/journal.py obsidian --root "<project>/project-journal"
+python <skill>/scripts/journal.py obsidian --root "<project>/project-journal" --open
+python <skill>/scripts/journal.py obsidian --root "<project>/project-journal" --check
+```
+
 ## It records and patches itself
 
 This skill manages itself as a project too:
 
-- Everything that breaks in real use goes into [`evolution/LEDGER.md`](evolution/LEDGER.md) — **21 real fix entries, each with a reproduction and a regression test**
-- Every fix must pass `scripts/selftest.py` — **38 regression checks** gating each release; failures abort the release
+- Everything that breaks in real use goes into [`evolution/LEDGER.md`](evolution/LEDGER.md) — **24 real fix entries, each with a reproduction and a regression test**
+- Every fix must pass `scripts/selftest.py` — **52 regression checks** gating each release; failures abort the release
 - After a fix: automatic version bump, CHANGELOG entry, and migration of existing projects (**without touching any journal or record**)
 
 > In other words: **this is itself a complete case study of "a flight recorder recording its own birth."** Open the ledger and watch.

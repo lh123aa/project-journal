@@ -1,6 +1,6 @@
 ---
 name: project-journal
-description: 项目全过程跟踪与经验资产化引擎。对任何项目调用一次即装上"飞行记录仪"：建立独立记录文件夹、注入会话锚点、建立记录协议；此后每次会话自动续记——有价值的讨论与判断、每日执行、遇到的困难与解法、关键决策与取舍、真实数字（时间/成本/转化/收入）、风险与依赖——直到变现成功或失败，最后沉淀为给人看、给 AI 读、可对外销售的 Markdown 数字资产（案例研究/打法手册/经验教训）。触发词：项目跟踪、过程记录、项目日志、每日记录、决策记录、复盘、经验教训、变现追踪、项目复盘、记录这个项目、跟踪这个项目、build in public、project journal、decision log、lessons learned、case study、retrospective。内置自我迭代机制：运行中发现的 bug／逻辑问题会记录进 skill 自身台账（evolve），修复后自动跑回归自测、升版本、写 CHANGELOG 并迁移已有项目。触发词补充：skill 自我迭代、改进 skill、skill 有 bug、记录这个问题下次别再犯。最短口令：跟踪项目、记一下、项目状态、复盘、结项、出资产。
+description: 项目全过程跟踪与经验资产化引擎。对任何项目调用一次即装上"飞行记录仪"：建立独立记录文件夹、注入会话锚点、建立记录协议；此后每次会话自动续记——有价值的讨论与判断、每日执行、遇到的困难与解法、关键决策与取舍、真实数字（时间/成本/转化/收入）、风险与依赖——直到变现成功或失败，最后沉淀为给人看、给 AI 读、可对外销售的 Markdown 数字资产（案例研究/打法手册/经验教训）。触发词：项目跟踪、过程记录、项目日志、每日记录、决策记录、复盘、经验教训、变现追踪、项目复盘、记录这个项目、跟踪这个项目、build in public、project journal、decision log、lessons learned、case study、retrospective。内置自我迭代机制：运行中发现的 bug／逻辑问题会记录进 skill 自身台账（evolve），修复后自动跑回归自测、升版本、写 CHANGELOG 并迁移已有项目。触发词补充：skill 自我迭代、改进 skill、skill 有 bug、记录这个问题下次别再犯。可选 Obsidian 可视化驾驶舱（HOME.md + 5 个视图，原生 Markdown，零第三方插件）。最短口令：跟踪项目、记一下、项目状态、复盘、结项、出资产。
 ---
 
 # project-journal — 项目全过程跟踪与经验资产化
@@ -33,6 +33,30 @@ description: 项目全过程跟踪与经验资产化引擎。对任何项目调�
 - 更口语的说法都按上表映射："帮我跟踪这个项目""记一下今天的""这个项目怎么样了""做完了总结下""能卖了吗"。
 - 首次执行 **跟踪项目** 时必须问清**成功线与止损线**（见 §4.1 第 1 步），不能跳过。
 - 被叫口令但当前没有跟踪中的项目时，先问"跟踪哪个项目"，不要猜。
+
+---
+
+## 0.2 安装（一次性，装完即用）
+
+在技能仓库根目录执行：
+
+```bash
+python scripts/setup.py --yes
+```
+
+它会一次完成：注册到各 Agent 工具 → 检测/静默安装 Obsidian（Windows 优先 D 盘）→ 创建起始 vault → 写 `~/.project-journal/config.json`。
+
+- 不想装 Obsidian：`python scripts/setup.py --no-obsidian`
+- 同时接入一个已有项目：`python scripts/setup.py --yes --project "<项目根>"`
+- 只检查安装：`python scripts/setup.py --check`
+- 安装完成后用 Obsidian 打开：`python scripts/setup.py --yes --open`
+- 已安装 Obsidian 1.8+ 会直接复用，不会重复下载；低于 1.8 建议升级
+
+视图生成（每个项目单独跑）：
+
+```bash
+python "<SKILL>/scripts/journal.py" obsidian --root "<项目根>/project-journal" --open
+```
 
 ---
 
@@ -77,6 +101,8 @@ Skill 不会自己运行。**持续跟踪 = 四个装置的组合**，`init` 会
 ├── INDEX.md             【自动生成】全部条目与档案的目录
 ├── NEXT-ACTIONS.md      未完成事项（人/Agent 手写，带 checkbox）
 ├── tracker.json         【自动生成】机器可读状态
+├── HOME.md              【自动生成】驾驶舱入口（可选，Obsidian 用）
+├── _views/              【自动生成】5 个视图：decisions / problems / milestones / metrics / reviews
 ├── journal/             原始层：YYYY-MM-DD.md，按时间 append-only，永不改写
 ├── records/             档案层：一主题一文件，可检索可引用
 │   ├── decisions/       ADR-0001-*.md     决策与取舍（含被否决的选项）
@@ -97,6 +123,34 @@ Skill 不会自己运行。**持续跟踪 = 四个装置的组合**，`init` 会
 ```
 
 **为什么分三层**：日记是**事实**（不可篡改），档案是**知识**（可被检索和引用），CSV 是**数字**（可算可画图）。三者互不污染，也就能各自被复用。
+
+### 3.1 可视化层（可选，Obsidian）
+
+`journal.py obsidian` 在记录根目录生成 `HOME.md` + `_views/` 五个视图。它是**生成层**，不是第四层真源：
+
+- 只读 `journal/` / `records/` / `metrics/`，**不改写**任何日记或档案
+- 视图可随时重建，因此不会产生双真源
+- 零第三方插件：只用原生 Markdown / Mermaid / Properties / Canvas；不依赖 Dataview、Templater
+- 链接用相对 Markdown，GitHub / VS Code 也能读
+- 视图不含时间戳，重复生成幂等；`--check` 发现过期返回 1
+
+| 视图 | 内容 |
+|---|---|
+| `HOME.md` | 现在在哪 / 成败标尺 / 未闭环 / 下一步 / 最近条目 |
+| `_views/decisions.md` | 决策库：当时为什么这么选 |
+| `_views/problems.md` | 问题与解法：卡在哪、怎么绕过去 |
+| `_views/milestones.md` | 里程碑：项目走到哪了 |
+| `_views/metrics.md` | 数据：真实数字与收支 |
+| `_views/reviews.md` | 复盘与资产：复盘、文档、可售资产包 |
+
+```bash
+journal.py obsidian --root <记录根>                  # 生成/刷新
+journal.py obsidian --root <记录根> --open           # 生成并用 Obsidian 打开
+journal.py obsidian --root <记录根> --check          # 只检查是否过期
+journal.py obsidian --root <记录根> --install-missing # 未装 Obsidian 时自动安装
+```
+
+Obsidian 是可选依赖（1.8+）。首次安装用 `scripts/setup.py --yes`；只想记录不看视图时加 `--no-obsidian`。
 
 ---
 
@@ -197,6 +251,8 @@ python "<SKILL>/scripts/journal.py" resume --root "<root>"
 ## 7. CLI 速查
 
 脚本：`<SKILL>/scripts/journal.py`（Python 3，**仅标准库**，无依赖）
+一键安装：`python "<SKILL>/scripts/setup.py" --yes`（注册 + Obsidian + 起始 vault + 全局配置）
+Obsidian 安装器：`python "<SKILL>/scripts/install-obsidian.py" [--check|--dry-run|--yes]`
 统一参数：`--root <记录根目录>`（必填）；日期类参数 `--date YYYY-MM-DD`（默认本地今天）
 
 ```bash
@@ -222,6 +278,10 @@ review    --root <根> --period weekly|monthly        # 生成复盘骨架（自
 closeout  --root <根> --outcome success|failure|pivot|paused --title "..." 
 publish   --root <根> [--outdir <目录>] [--force]    # 脱敏 → 可销售资产包
 vault-index --root <vault>                           # 跨项目总览（多项目资产化）
+
+# 可视化（可选，Obsidian 1.8+）
+obsidian --root <根> [--open] [--check] [--install-missing] [--force]
+                                                     # HOME.md + 5 个视图；零插件、不改记录
 
 # 自我迭代（记录并修订这个 skill 自身）
 evolve --category bug|logic|schema|docs|usability|performance|feature \
@@ -304,6 +364,7 @@ journal.py evolve-apply --id EV-0005 --bump minor --summary "改了什么、为�
 journal.py lint --root <记录根>       # 提示 skill / 契约版本落后
 journal.py upgrade --root <记录根>    # 迁移 tracker 字段、PROTOCOL 契约、AGENTS 锚点
 journal.py doctor                     # skill 安装自检：文件齐全 / 版本一致 / 语法 / 台账
+python "<SKILL>/scripts/setup.py" --check   # 一键安装自检：文件 / Obsidian / vault / 全局配置
 `@
 
 - `upgrade` **不动任何日记与档案**（历史不可变），只更新基础设施

@@ -5,6 +5,21 @@
 
 <!-- CHANGELOG:INSERT -->
 
+## [1.6.2] - 2026-10-21
+- 修复 LEDGER.md 顶部版本落后一个 release：ledger_md 优先使用台账版本号，并新增第 52 项回归用例。（EV-0024）
+- 类别 / 严重度：bug / low
+- 台账：evolution/LEDGER.md 的 EV-0024
+
+## [1.6.1] - 2026-10-21
+- 修复 Obsidian 官方签名主体为 Dynalist 时的验签误判：trusted_signer 同时接受 Obsidian/Dynalist，并新增回归用例，避免干净机器首次安装被错误中止。（EV-0023）
+- 类别 / 严重度：bug / high
+- 台账：evolution/LEDGER.md 的 EV-0023
+
+## [1.6.0] - 2026-10-21
+- 新增 Obsidian 可视化层（HOME.md + 5 视图，零插件、不改记录）与一键安装 setup.py（技能注册 + Obsidian 静默安装 + 起始 vault + 全局配置）；补充安装器、版本兼容、回归用例与文档。（EV-0022）
+- 类别 / 严重度：feature / high
+- 台账：evolution/LEDGER.md 的 EV-0022
+
 ## [1.5.0] - 2026-10-09
 - 新增跨项目健康巡检与批量迁移：journal.py health --root 父目录（版本漂移 / 锚点缺失 / CHARTER 待填 / 停滞 / 空壳 / 记录量 一表看完，支持 --json）；journal.py upgrade --all 父目录 批量迁移到当前版本，保持只动 tracker、契约与锚点、不改写日记与档案的语义；新增第 36-37 项回归用例（EV-0020）
 - 类别 / 严重度：feature / medium

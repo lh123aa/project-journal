@@ -13,7 +13,7 @@
 - ✍️ **不写流水账**：只记有判断、有结论、有数字的东西——决策、卡点、解法、认知更新、真实数字
 - 💰 **能收口**：立项时写死成功线与止损线；结项时按它们客观判定成败，并产出案例研究 / 打法手册 / 教训清单
 
-[免费安装](#安装30-秒) ｜ [完整方法论包 ↓](#想要完整方法论) ｜ [English](README.en.md)
+[免费安装](#安装一条命令) ｜ [完整方法论包 ↓](#想要完整方法论) ｜ [English](README.en.md)
 
 ---
 
@@ -33,16 +33,35 @@
 也支持自然语言："帮我跟踪这个项目"、"记一下今天的"、"这个项目怎么样了"、"做完了总结下"、"能卖了吗"。
 英文可用 `track this project` / `journal this`。
 
-## 安装（30 秒）
+## 安装（一条命令）
 
 ```bash
 git clone https://github.com/lh123aa/project-journal.git ~/.agents/skills/project-journal
 # Windows: %USERPROFILE%\.agents\skills\project-journal
-python ~/.agents/skills/project-journal/scripts/install-global.py   # 一键注册到各工具
+python ~/.agents/skills/project-journal/scripts/setup.py --yes
+```
+
+这一条命令会一次完成：
+
+- 把技能注册到 Claude Code / opencode / Cursor / Codex CLI / Gemini CLI / Windsurf
+- 检测 Obsidian；没有则从官方 GitHub 下载、Authenticode 验签、静默安装（**D 盘优先**，D 不可用回退默认盘）
+- 创建起始 vault（Windows 默认 `D:\ProjectJournal-Vault`）
+- 写入 `~/.project-journal/config.json`，装完直接可用
+
+不想装 Obsidian（只记录、不看视图）：
+
+```bash
+python ~/.agents/skills/project-journal/scripts/setup.py --no-obsidian
+```
+
+已有项目想一次接好：
+
+```bash
+python ~/.agents/skills/project-journal/scripts/setup.py --yes --project "G:/path/to/your-project"
 ```
 
 覆盖：Claude Code / opencode / Cursor / Codex CLI / Gemini CLI / Windsurf。
-依赖：**Python 3.8+，仅标准库**，零第三方依赖。
+依赖：**Python 3.8+，仅标准库**；Obsidian 是可选可视化层（1.8+，已安装则直接复用，不会重复装）。
 
 > 首次执行「跟踪项目」时，它会要求你写下**成功线与止损线**——这是最后判定"变现成功还是失败"的唯一客观标尺，别跳过。
 
@@ -72,12 +91,36 @@ python ~/.agents/skills/project-journal/scripts/install-global.py   # 一键注�
 产出    publish/<日期>/  脱敏后可售的 8 个资产文件
 ```
 
+## 可视化：一眼看懂项目（可选）
+
+`journal.py obsidian` 会在记录目录生成一个**驾驶舱**和五个视图：
+
+```
+HOME.md                 现在在哪 / 成败标尺 / 未闭环 / 下一步 / 最近条目
+_views/decisions.md     决策库：当时为什么这么选
+_views/problems.md      问题与解法：卡在哪、怎么绕过去
+_views/milestones.md    里程碑：项目走到哪了
+_views/metrics.md       数据：真实数字与收支
+_views/reviews.md       复盘与资产：复盘、文档、可售资产包
+```
+
+- **零第三方插件**：只用 Obsidian 原生 Markdown / Mermaid / Properties / Canvas；不装 Dataview、Templater
+- **不破坏记录**：视图是生成层，`journal/`、`records/`、`metrics/` 一个字都不改
+- **不产生双真源**：视图可随时重建；`--check` 只检查是否过期，过期返回 1
+- **不是 Obsidian 也能读**：相对 Markdown 链接，GitHub / VS Code 直接可读
+
+```bash
+python <skill>/scripts/journal.py obsidian --root "<项目根>/project-journal"
+python <skill>/scripts/journal.py obsidian --root "<项目根>/project-journal" --open
+python <skill>/scripts/journal.py obsidian --root "<项目根>/project-journal" --check
+```
+
 ## 它记录并修订自己（自我迭代）
 
 这个技能把自己也当项目在管：
 
-- 运行中发现的问题进 [`evolution/LEDGER.md`](evolution/LEDGER.md)——**21 条真实修复记录，每条带复现与回归用例**
-- 每次修复先过 `scripts/selftest.py`——**38 项回归门禁**，不通过就中止发布
+- 运行中发现的问题进 [`evolution/LEDGER.md`](evolution/LEDGER.md)——**24 条真实修复记录，每条带复现与回归用例**
+- 每次修复先过 `scripts/selftest.py`——**52 项回归门禁**，不通过就中止发布
 - 修复后自动升版本、写 CHANGELOG、迁移已有项目（**不动任何日记与档案**）
 
 > 也就是说：**这本身就是一个"飞行记录仪记录自己诞生"的完整案例**。翻开台账即可围观。

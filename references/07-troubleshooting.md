@@ -72,5 +72,68 @@
 ## 11. 命令返回码
 
 - `0` 成功
-- `1` lint 失败（有 error，或 `--strict` 下有 warn）
-- `2` 参数/路径错误（如未指定 `--root`、目录不存在）
+- `1` lint 失败（有 error，或 `--strict` 下有 warn）；`obsidian --check` 表示视图过期；`install-obsidian.py --check` 表示未安装；`selftest.py` 表示有用例失败
+- `2` 参数/路径错误（如未指定 `--root`、目录不存在）；`setup.py` 也用它表示参数冲突/项目路径无效
+- `3` `setup.py --require-obsidian` 但 Obsidian 未安装/安装失败
+- `4` `setup.py` 项目初始化失败
+
+## 12. Obsidian 可视化与一键安装
+
+### 12.1 一键安装后先跑自检
+
+```bash
+python "<SKILL>/scripts/setup.py" --check
+python "<SKILL>/scripts/install-obsidian.py" --check
+```
+
+`setup.py --check` 检查：全局配置、vault 的 `HOME.md`、`.obsidian` 配置、项目记录目录、Obsidian 路径/版本。它**不写入**任何文件；`--json` 输出可机器解析（日志走 stderr）。
+
+### 12.2 检测不到已安装的 Obsidian
+
+- 先跑 `python scripts/install-obsidian.py --check --json` 看 `source`：
+  - `state`：来自 `~/.project-journal/obsidian.json`
+  - `registry:...`：来自 Windows 卸载注册表
+  - `candidate:...`：来自常见安装路径
+- 常见路径包括 `%LOCALAPPDATA%\Programs\Obsidian`、`Program Files`、`Program Files (x86)`、`D:\Obsidian`、`D:\Program Files (x86)\Obsidian` 等
+- 如果装在自定义位置：`python scripts/install-obsidian.py --install-dir "<目录>" --yes`，或手动打开一次 Obsidian 后重跑 `--check`
+- 状态文件损坏：删除 `~/.project-journal/obsidian.json` 后重跑 `--check`，会回退到注册表/路径检测
+
+### 12.3 下载或验签失败
+
+- 安装器从 Obsidian 官方 GitHub Release 下载，并用 Windows Authenticode 验签；网络/代理失败时会中止，不会安装未验签文件
+- 官方签名主体是 **`CN=Dynalist Inc`**（Obsidian 母公司），安装器同时接受含 `Obsidian` 或 `Dynalist` 的证书；只认 `Obsidian` 会误拒正版（EV-0023）
+- 技能本身仍可用（除非 `setup.py --require-obsidian`）；可稍后重跑：
+  ```bash
+  python scripts/install-obsidian.py --yes
+  ```
+- 公司网络拦截 GitHub 时，先手动从 [obsidian.md/download](https://obsidian.md/download) 安装，再跑 `setup.py --yes`（会复用已有安装）
+- `--no-verify` 只建议在你已手动核对安装包来源/哈希时使用；不要用它绕过公司安全策略
+
+### 12.4 安装到了默认盘，没进 D 盘
+
+- Obsidian NSIS 安装器在目标路径含空格时可能忽略 `/D=`；安装器会尝试把默认安装复制到 `D:\Obsidian` 并在原位置建 junction
+- 若复制/junction 失败，会保留默认盘安装并告警；这是有意的安全回退，不会留下半安装状态
+- 查看实际位置：`python scripts/install-obsidian.py --check --json`
+- 指定目录重试：`python scripts/install-obsidian.py --yes --install-dir "D:\Obsidian"`；不允许搬迁时加 `--no-relocate`
+- D 盘空间不足（< 2 GB）或不可写时，`setup.py` 的 vault 会回退到 `~/Documents/ProjectJournal-Vault`
+
+### 12.5 视图打不开 / 链接失效 / 过期
+
+- **必须把记录目录本身作为 vault 打开**，不是它的父目录；`HOME.md` 在记录根，五个视图在 `_views/`
+- 重新生成：`journal.py obsidian --root <记录根>`；只检查：`--check`（过期返回 1）
+- 不要手改 `HOME.md` / `_views/`，下次生成会覆盖；要改内容改源日记/档案
+- 视图用相对 Markdown 链接，中文和空格路径已做转义；GitHub / VS Code 也能读
+- 打开后看不到 `.obsidian` 配置：确认记录根下有 `.obsidian/app.json`；没有就重跑 `obsidian`（不会覆盖已有配置，除非 `--force`）
+
+### 12.6 Obsidian 1.8 与 1.9+ 的配置差异
+
+- 最低支持 **1.8.0**；1.8.x 的 `core-plugins.json` 是数组，1.9+ 是对象
+- 生成器会按检测到的版本选择格式；已存在的旧格式会自动迁移（对象↔数组），并在输出里标注
+- 我们的视图只用原生 Markdown / Mermaid / Properties / Canvas，**不依赖 Bases**；1.8.x 足够
+- 版本检测不到时按 1.9+ 对象格式写；如果界面异常，升级 Obsidian 或删掉 `.obsidian/core-plugins.json` 让 Obsidian 重建默认值
+
+### 12.7 已有 Obsidian 会被覆盖吗
+
+- 不会。检测到 1.8+ 直接复用，不下载、不移动、不改安装目录；`setup.py` 只写 `~/.project-journal/obsidian.json` 和 vault 配置
+- 只有显式 `install-obsidian.py --force` 才会重装
+- 升级 Obsidian 用其自带更新器或官方安装包；本 skill 不主动升级已有安装
